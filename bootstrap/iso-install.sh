@@ -336,7 +336,8 @@ say "installing rayconfig into the new system"
 TARGET=/mnt/home/$NEWUSER/.local/share/rayconfig
 if [ "$DRY" = 1 ]; then
 	printf '  %s+%s copy %s -> %s\n' "$D" "$Z" "$REPO_SRC" "$TARGET"
-	printf '  %s+%s su - %s -c "cd ~/.local/share/rayconfig && ./bootstrap/install.sh --yes"\n' "$D" "$Z" "$NEWUSER"
+	printf '  %s+%s arch-chroot /mnt env HOME=/home/%s RAYCONFIG_ALLOW_ROOT=1 ./bootstrap/install.sh --yes\n' \
+		"$D" "$Z" "$NEWUSER"
 else
 	mkdir -p "$TARGET"
 	cp -a "$REPO_SRC/." "$TARGET/"
@@ -345,17 +346,13 @@ else
 		die "user $NEWUSER was not created in the new system"
 	arch-chroot /mnt chown -R "$NEWUSER:$NEWUSER" "/home/$NEWUSER/.local"
 	ok "repo owned by $NEWUSER"
-	# Temporary passwordless sudo so the config stage can use pacman. Removed
-	# again immediately after; nothing about it survives the install.
-	printf '%%wheel ALL=(ALL:ALL) NOPASSWD: ALL\n' >/mnt/etc/sudoers.d/99-rayconfig-tmp
-	chmod 440 /mnt/etc/sudoers.d/99-rayconfig-tmp
-	arch-chroot /mnt su - "$NEWUSER" -c \
-		'cd ~/.local/share/rayconfig && ./bootstrap/install.sh --yes' ||
-		{
-			rm -f /mnt/etc/sudoers.d/99-rayconfig-tmp
-			die "rayconfig stage failed; see the log above"
-		}
-	rm -f /mnt/etc/sudoers.d/99-rayconfig-tmp
+	# No sudo and no tty here: run the config stage as root with HOME pointed
+	# at the new user, so pacman is called directly and configs land in the
+	# right home. Then hand the whole home back to the user.
+	arch-chroot /mnt env HOME="/home/$NEWUSER" RAYCONFIG_ALLOW_ROOT=1 \
+		/bin/bash -c 'cd "$HOME/.local/share/rayconfig" && ./bootstrap/install.sh --yes' ||
+		die "rayconfig stage failed; see the error above"
+	arch-chroot /mnt chown -R "$NEWUSER:$NEWUSER" "/home/$NEWUSER"
 	ok "rayconfig"
 fi
 

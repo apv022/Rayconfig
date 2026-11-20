@@ -19,7 +19,7 @@ themes/<name>/palette  ──►  bin/gen-theme  ──►  every config that ha
 Boot the Arch ISO, connect to the network (`iwctl` for wifi), then:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/apv022/Rayconfig/refs/tags/v0.2.1/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/apv022/Rayconfig/refs/tags/v0.2.2/install.sh | sh
 ```
 
 It detects archiso and runs `bootstrap/iso-install.sh`, which:
@@ -48,7 +48,7 @@ The same URL, no flags: it detects that you are not on the ISO and only
 installs the desktop (packages, configs, theme, verify).
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/apv022/Rayconfig/refs/tags/v0.2.1/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/apv022/Rayconfig/refs/tags/v0.2.2/install.sh | sh
 ./install.sh --dry-run
 ./install.sh --check
 ```

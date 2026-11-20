@@ -98,7 +98,7 @@ stage_preflight() {
 	[ "$(id -u)" -ne 0 ] || [ "${RAYCONFIG_ALLOW_ROOT:-0}" = 1 ] ||
 		die "run as your user, not root (the script calls sudo itself; set RAYCONFIG_ALLOW_ROOT=1 in containers)"
 	if [ "$(id -u)" -eq 0 ]; then
-		warn "running as root; configs will land in root's home"
+		warn "running as root; configs will land in $HOME"
 		SUDO=()
 	else
 		SUDO=(sudo)
