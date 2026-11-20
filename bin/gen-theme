@@ -53,6 +53,15 @@ load "$RENDER/themes/sunset/palette" "_dark" "$dart"
 load "$RENDER/themes/sunny/palette" "_light" "$lite"
 printf 'theme=%s\n' "$theme" >>"$cur"
 
+# foot 1.26+ renamed [colors] to [colors-dark]/[colors-light]. Pick the section
+# that matches the palette's variant instead of hard-coding the old name.
+variant=$(sed -n 's/^variant=//p' "$RENDER/themes/$theme/palette" | head -n1)
+case $variant in
+dark) printf 'colors_section=[colors-dark]\n' >>"$cur" ;;
+light) printf 'colors_section=[colors-light]\n' >>"$cur" ;;
+*) die "themes/$theme/palette needs variant=dark or variant=light" ;;
+esac
+
 # sed script. Escape the delimiter and '&' even though palettes are hex.
 sedscript=$tmp/sed
 : >"$sedscript"

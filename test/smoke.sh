@@ -59,6 +59,15 @@ for theme in sunset sunny; do
 	else
 		fail "$theme: theme.sh missing"
 	fi
+	section=dark
+	[ "$theme" = sunny ] && section=light
+	if grep -q "^\[colors-$section\]" "$tmp/dots/foot/foot.ini" &&
+		grep -q "^initial-color-theme=$section" "$tmp/dots/foot/foot.ini" &&
+		! sed -n '/^\[main\]/,/^\[/p' "$tmp/dots/foot/foot.ini" | grep -q '^alpha='; then
+		pass "$theme: foot colors section and alpha placement"
+	else
+		fail "$theme: foot.ini uses the wrong foot color dialect"
+	fi
 done
 
 printf '\nbehavior\n'

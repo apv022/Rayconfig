@@ -136,6 +136,18 @@ if [ -x "$ROOT/bin/status" ]; then
 	fi
 fi
 
+head_ "foot"
+if command -v foot >/dev/null 2>&1 && foot --help 2>&1 | grep -q -- '--check-config'; then
+	if out=$(foot --check-config --config="$CFG/foot/foot.ini" 2>&1); then
+		good "foot config parses"
+	else
+		bad "foot config invalid:"
+		printf '%s\n' "$out" | sed 's/^/       /'
+	fi
+else
+	meh "foot not installed (or no --check-config); skipped foot config check"
+fi
+
 head_ "session"
 if [ -n "${SWAYSOCK:-}" ] && command -v swaymsg >/dev/null 2>&1; then
 	good "running inside sway"
