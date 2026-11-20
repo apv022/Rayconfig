@@ -31,6 +31,11 @@ From a checkout instead:
 Options: `--only <stages>`, `--skip <stages>`, `--yes`, `--extras`,
 `--services`, `--theme sunny|sunset`.
 
+The repo installs itself to `~/.local/share/rayconfig` and symlinks your
+configs into it, so that directory is the live system — `ray update` is a
+`git pull` plus a re-link. Set `RAYCONFIG_DIR` to put it elsewhere. Never run
+the installer from a temp checkout; it refuses.
+
 ## What it assumes
 
 A **working Arch install with a user and sudo**. It does not partition disks,
@@ -96,7 +101,7 @@ comments in `dots/sway/config.d/30-binds.conf`.
 ## Layout
 
 ```
-install.sh              the only thing you curl; clones and execs the real installer
+install.sh              the only thing you curl; installs the repo to ~/.local/share/rayconfig
 bootstrap/              installer stages, package lists
 bin/                    ray, status, theme, gen-theme, doctor, keys, vol, bright, shot
 dots/                   hand-written configs; *.in files are templates

@@ -127,6 +127,15 @@ stage_preflight() {
 	[ "${free:-0}" -gt 500000 ] || die "need ~500MB free in \$HOME, have ${free}K"
 	ok "disk: $((free / 1024))MB free"
 
+	# Symlinked configs point into $ROOT. A temp-dir checkout (e.g. a hand-rolled
+	# `curl | sh` that clones to /tmp with mktemp) would leave dangling configs.
+	case $ROOT in
+	/tmp/tmp.* | /var/tmp/tmp.*)
+		die "running from a temporary checkout ($ROOT); configs would dangle. Use install.sh, or clone somewhere permanent"
+		;;
+	esac
+	ok "source: $ROOT"
+
 	if [ ! -t 0 ]; then
 		warn "stdin is not a tty (piped install); assuming --yes"
 		YES=1
