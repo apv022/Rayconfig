@@ -1,0 +1,147 @@
+#!/usr/bin/env bash
+# doctor — verify the install. Read-only. Exit 1 if something is broken.
+#
+# This is the same check `install.sh --check` runs, and the thing to paste
+# into an issue when the desktop misbehaves.
+set -uo pipefail
+
+ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+CFG=${XDG_CONFIG_HOME:-$HOME/.config}
+STATE=${XDG_STATE_HOME:-$HOME/.local/state}/rayconfig
+LOCAL_BIN=$HOME/.local/bin
+THEME=$(cat "$STATE/theme" 2>/dev/null || echo sunset)
+
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+	G=$'\033[38;5;149m'; R=$'\033[38;5;203m'; Y=$'\033[38;5;215m'
+	D=$'\033[38;5;244m'; Z=$'\033[0m'
+else
+	G=; R=; Y=; D=; Z=
+fi
+
+FAIL=0
+WARN=0
+PASS=0
+
+good() { PASS=$((PASS + 1)); printf '  %sok%s   %s\n' "$G" "$Z" "$*"; }
+bad() { FAIL=$((FAIL + 1)); printf '  %sfail%s %s\n' "$R" "$Z" "$*"; }
+meh() { WARN=$((WARN + 1)); printf '  %swarn%s %s\n' "$Y" "$Z" "$*"; }
+head_() { printf '\n%s%s%s\n' "$D" "$*" "$Z"; }
+
+head_ "binaries"
+missing=0
+while IFS= read -r cmd; do
+	case $cmd in '' | '#'*) continue ;; esac
+	if command -v "$cmd" >/dev/null 2>&1; then
+		PASS=$((PASS + 1))
+	else
+		missing=$((missing + 1))
+	fi
+done <"$ROOT/bootstrap/commands.txt"
+if [ "$missing" -eq 0 ]; then
+	good "all required commands present"
+else
+	bad "$missing missing — run: install.sh --only packages"
+fi
+
+head_ "links"
+for d in sway foot mako fuzzel; do
+	link=$CFG/$d
+	src=$ROOT/dots/$d
+	if [ -L "$link" ] && [ "$(readlink -f "$link")" = "$(readlink -f "$src")" ]; then
+		good "$link"
+	elif [ -d "$link" ]; then
+		bad "$link is a real directory, not a symlink (installer was skipped?)"
+	else
+		bad "$link missing — run: install.sh --only link"
+	fi
+done
+for f in ray status theme gen-theme doctor keys vol bright shot; do
+	if [ -x "$LOCAL_BIN/$f" ]; then
+		PASS=$((PASS + 1))
+	else
+		bad "$LOCAL_BIN/$f missing or not executable"
+	fi
+done
+good "utilities in $LOCAL_BIN"
+
+head_ "palettes"
+keys_of() { grep -vE '^[[:space:]]*(#|$)' "$1" | cut -d= -f1 | sort; }
+a=$(keys_of "$ROOT/themes/sunset/palette")
+b=$(keys_of "$ROOT/themes/sunny/palette")
+if [ "$a" = "$b" ]; then
+	good "sunset and sunny define the same keys ($(printf '%s\n' "$a" | wc -l))"
+else
+	bad "palette keys differ between sunset and sunny:"
+	diff <(printf '%s\n' "$a") <(printf '%s\n' "$b") | sed 's/^/       /'
+fi
+if grep -qE '=#[0-9a-fA-F]{6}$' "$ROOT/themes/$THEME/palette"; then
+	good "active theme: $THEME"
+else
+	bad "themes/$THEME/palette has malformed values"
+fi
+
+head_ "generated configs"
+stale=0
+present=0
+for out in \
+	dots/sway/config.d/00-colors.conf \
+	dots/sway/config.d/40-bar.conf \
+	dots/foot/foot.ini \
+	dots/mako/config \
+	dots/fuzzel/fuzzel.ini; do
+	[ -f "$ROOT/$out" ] || {
+		bad "$out missing — run: ray theme $THEME"
+		continue
+	}
+	present=$((present + 1))
+	if [ "$ROOT/themes/$THEME/palette" -nt "$ROOT/$out" ]; then
+		stale=$((stale + 1))
+	fi
+done
+[ "$present" -eq 0 ] || good "$present generated file(s) present"
+[ "$stale" -eq 0 ] || meh "$stale generated file(s) older than the palette — run: ray theme $THEME"
+
+head_ "sway"
+if command -v sway >/dev/null 2>&1; then
+	if out=$(sway --validate -c "$CFG/sway/config" 2>&1); then
+		good "config parses"
+	else
+		bad "sway config invalid:"
+		printf '%s\n' "$out" | sed 's/^/       /'
+	fi
+else
+	meh "sway not installed; skipped config validation"
+fi
+
+head_ "bar"
+if [ -x "$ROOT/bin/status" ]; then
+	line=$("$ROOT/bin/status" --once 2>/dev/null || true)
+	if [ -z "$line" ]; then
+		bad "status produced no output"
+	elif command -v python3 >/dev/null 2>&1; then
+		if printf '%s' "$line" | python3 -m json.tool >/dev/null 2>&1; then
+			good "status emits valid i3bar JSON"
+		else
+			bad "status JSON is invalid: $line"
+		fi
+	elif printf '%s' "$line" | grep -q '^\[.*\]$'; then
+		good "status emits a JSON array (python3 not installed for full check)"
+	else
+		bad "status output does not look like JSON"
+	fi
+fi
+
+head_ "session"
+if [ -n "${SWAYSOCK:-}" ] && command -v swaymsg >/dev/null 2>&1; then
+	good "running inside sway"
+else
+	meh "not inside sway (expected when checking from a TTY)"
+fi
+
+printf '\n'
+if [ "$FAIL" -gt 0 ]; then
+	printf '%s%d failed%s, %d warnings, %d passed\n' "$R" "$FAIL" "$Z" "$WARN" "$PASS"
+	exit 1
+fi
+printf '%sall good%s — %d passed, %d warnings\n' "$G" "$Z" "$PASS" "$WARN"
+[ "$WARN" -eq 0 ] || exit 0

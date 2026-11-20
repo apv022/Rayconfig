@@ -1,0 +1,18 @@
+#!/bin/sh
+# bright — backlight, no daemon.
+#
+#   bright up [step] | bright down [step] | bright set <0-100>
+set -eu
+
+command -v brightnessctl >/dev/null 2>&1 || exit 1
+step=${2:-5}
+
+case ${1:-} in
+up) brightnessctl set "${step}%+" >/dev/null ;;
+down) brightnessctl set "${step}%-" >/dev/null ;;
+set) brightnessctl set "${2:?percent}%" >/dev/null ;;
+*)
+	printf 'usage: bright up|down [step] | set <0-100>\n' >&2
+	exit 2
+	;;
+esac

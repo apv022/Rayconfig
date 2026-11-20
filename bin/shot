@@ -1,0 +1,35 @@
+#!/bin/sh
+# shot — screenshots with grim, no wrapper app.
+#
+#   shot region   select an area, copy to clipboard
+#   shot full     whole output, saved to ~/Pictures/screenshots
+#   shot save     select an area, saved to ~/Pictures/screenshots
+set -eu
+
+dir=${RAY_SHOT_DIR:-$HOME/Pictures/screenshots}
+stamp() { date +%Y%m%d-%H%M%S; }
+
+case ${1:-region} in
+region)
+	sel=$(slurp) || exit 0
+	grim -g "$sel" - | wl-copy
+	printf 'shot: region copied\n'
+	;;
+save)
+	mkdir -p "$dir"
+	sel=$(slurp) || exit 0
+	f="$dir/$(stamp).png"
+	grim -g "$sel" "$f"
+	printf 'shot: %s\n' "$f"
+	;;
+full)
+	mkdir -p "$dir"
+	f="$dir/$(stamp).png"
+	grim "$f"
+	printf 'shot: %s\n' "$f"
+	;;
+*)
+	printf 'usage: shot region|save|full\n' >&2
+	exit 2
+	;;
+esac

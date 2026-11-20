@@ -1,0 +1,20 @@
+# Commands the desktop requires. Checked by bin/doctor.
+# Package names differ from binary names often enough that these are separate
+# from packages.txt on purpose.
+sway
+swaymsg
+swaybar
+swaylock
+swayidle
+swaybg
+foot
+fuzzel
+mako
+grim
+slurp
+wl-copy
+brightnessctl
+wpctl
+sed
+awk
+date

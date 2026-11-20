@@ -1,0 +1,25 @@
+# Rayconfig core. Official repos only — no AUR, by design.
+#
+# Keep this list boring. Every line here is something the desktop cannot boot
+# without, not something that would be nice.
+sway
+swaybg
+swayidle
+swaylock
+foot
+fuzzel
+mako
+grim
+slurp
+wl-clipboard
+brightnessctl
+pipewire
+pipewire-pulse
+wireplumber
+xdg-desktop-portal-wlr
+polkit
+iw
+git
+xdg-utils
+ttf-jetbrains-mono
+noto-fonts

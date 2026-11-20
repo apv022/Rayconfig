@@ -1,0 +1,18 @@
+# Rayconfig palette: sunset (dark)
+# Keys are shared with solarvim: bg bg2 bg3 fg dim sun amber orange red green
+# teal blue purple. accented/urgent are the two that get used for highlights.
+bg=#0b0b0b
+bg2=#161616
+bg3=#2a2a2a
+fg=#ffe9b0
+dim=#8a7a5a
+sun=#ffd60a
+amber=#ffb000
+orange=#ff7a00
+red=#dc143c
+green=#d9e04a
+teal=#ffa347
+blue=#ff9a3c
+purple=#b3123a
+accent=#ffb000
+urgent=#dc143c

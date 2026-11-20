@@ -1,0 +1,10 @@
+# Generated from themes/*/palette by bin/gen-theme. Edit the .in, not these.
+dots/sway/config.d/00-colors.conf
+dots/sway/config.d/40-bar.conf
+dots/foot/foot.ini
+dots/mako/config
+dots/fuzzel/fuzzel.ini
+dots/sway/config.d/90-local.conf
+
+*.tmp
+*.swp

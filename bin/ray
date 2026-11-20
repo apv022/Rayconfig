@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# ray — the CLI. Thin dispatcher; the work lives in one file per command.
+set -euo pipefail
+
+ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+
+usage() {
+	cat <<'EOF'
+ray — Rayconfig
+
+  ray install [opts]   run the installer (same as ./install.sh)
+  ray update           git pull + re-link + re-render + verify
+  ray doctor           verify the install
+  ray theme [name]     sunset | sunny | toggle
+  ray status           print one bar line (debugging)
+  ray keys             key cheat sheet
+  ray edit [name]      open a config in $EDITOR
+
+Configs live in dots/, palettes in themes/. Edit *.in, never the
+generated file beside it.
+EOF
+}
+
+sub=${1:-}
+[ $# -gt 0 ] && shift
+
+case $sub in
+install)
+	exec "$ROOT/bootstrap/install.sh" "$@"
+	;;
+update)
+	git -C "$ROOT" pull --ff-only
+	exec "$ROOT/bootstrap/install.sh" --yes "$@"
+	;;
+doctor)
+	exec "$ROOT/bin/doctor" "$@"
+	;;
+theme)
+	exec "$ROOT/bin/theme" "${@:-toggle}"
+	;;
+status)
+	exec "$ROOT/bin/status" "${@:---once}"
+	;;
+keys)
+	exec "$ROOT/bin/keys" "$@"
+	;;
+edit)
+	name=${1:-sway}
+	case $name in
+	sway | foot | mako | fuzzel)
+		exec "${EDITOR:-nvim}" "$ROOT/dots/$name"
+		;;
+	theme | palette)
+		exec "${EDITOR:-nvim}" "$ROOT/themes/$(cat "${XDG_STATE_HOME:-$HOME/.local/state}/rayconfig/theme" 2>/dev/null || echo sunset)/palette"
+		;;
+	*) exec "${EDITOR:-nvim}" "$ROOT" ;;
+	esac
+	;;
+'' | -h | --help | help)
+	usage
+	;;
+*)
+	printf 'ray: unknown command: %s\n\n' "$sub" >&2
+	usage >&2
+	exit 2
+	;;
+esac

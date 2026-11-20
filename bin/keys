@@ -1,0 +1,46 @@
+#!/bin/sh
+# keys — the cheat sheet, generated from the comments in the sway config.
+# Nothing to maintain: describe a bind with a '# comment' above it.
+set -eu
+
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+binds=$ROOT/dots/sway/config.d/30-binds.conf
+
+[ -f "$binds" ] || {
+	printf 'keys: no binds file at %s\n' "$binds" >&2
+	exit 1
+}
+
+# Resolve $mod from defaults so the cheat sheet says Super, not $mod.
+mod=$(sed -n 's/^[[:space:]]*set[[:space:]]\+\$mod[[:space:]]\+//p' \
+	"$ROOT/dots/sway/config.d/10-defaults.conf" 2>/dev/null | head -n1)
+mod=${mod:-Mod4}
+mod=$(printf '%s' "$mod" | sed 's/^Mod4$/Super/')
+
+awk -v mod="$mod" '
+	function trim(s) { sub(/^[[:space:]]+/, "", s); sub(/[[:space:]]+$/, "", s); return s }
+	{
+		line = $0
+		if (buf != "") line = buf " " line
+		if (line ~ /\\[[:space:]]*$/) {
+			sub(/\\[[:space:]]*$/, "", line)
+			buf = line
+			next
+		}
+		buf = ""
+		if (line ~ /^[[:space:]]*#/) {
+			desc = trim(substr(line, index(line, "#") + 1))
+			next
+		}
+		if (line ~ /^[[:space:]]*bindsym/) {
+			sub(/^[[:space:]]*bindsym[[:space:]]+/, "", line)
+			line = trim(line)
+			i = index(line, " ")
+			key = i ? substr(line, 1, i - 1) : line
+			cmd = i ? trim(substr(line, i + 1)) : ""
+			gsub(/\$mod/, mod, key)
+			printf "  %-22s %s\n", key, (desc != "" ? desc : cmd)
+			desc = ""
+		}
+	}
+' "$binds"

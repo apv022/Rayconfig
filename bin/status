@@ -1,0 +1,100 @@
+#!/bin/sh
+# status — the entire bar. swaybar reads i3bar JSON from stdin.
+#
+#   status          loop forever (what sway runs)
+#   status --once   one line, for tests
+#
+# No jq, no modules, no plugin API. Reads sysfs, wpctl, swaymsg.
+set -eu
+
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+STATE=${XDG_STATE_HOME:-$HOME/.local/state}/rayconfig
+
+# shellcheck disable=SC1090,SC1091
+[ -f "$STATE/theme.sh" ] && . "$STATE/theme.sh"
+: "${RAY_FG:=#ffe9b0}" "${RAY_DIM:=#8a7a5a}" "${RAY_ACCENT:=#ffb000}"
+: "${RAY_URGENT:=#dc143c}" "${RAY_BG:=#0b0b0b}"
+
+out=
+
+add() { # name text fg [bg]
+	out="$out${out:+,}{\"name\":\"$1\",\"full_text\":\"$2\",\"color\":\"$3\""
+	[ -n "${4:-}" ] && out="$out,\"background\":\"$4\""
+	out="$out}"
+}
+
+seg_net() {
+	for iface in /sys/class/net/*; do
+		[ -r "$iface/operstate" ] || continue
+		[ "$(cat "$iface/operstate")" = up ] || continue
+		name=${iface##*/}
+		case $name in lo | docker* | veth* | virbr* | vmnet* | tailscale* | tun* | wg*) continue ;; esac
+		if [ -d "$iface/wireless" ]; then
+			ssid=
+			if command -v iw >/dev/null 2>&1; then
+				ssid=$(iw dev "$name" link 2>/dev/null | awk '/SSID/ {print $2; exit}')
+			fi
+			add net " ${ssid:-wifi} " "$RAY_ACCENT"
+		else
+			add net " net " "$RAY_ACCENT"
+		fi
+		return 0
+	done
+	add net " offline " "$RAY_DIM"
+}
+
+seg_vol() {
+	command -v wpctl >/dev/null 2>&1 || return 0
+	raw=$(wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null) || return 0
+	pct=$(printf '%s' "$raw" | awk '{printf "%d", $2 * 100}')
+	case $raw in
+	*MUTED*) add vol " vol mute " "$RAY_URGENT" ;;
+	*) add vol " vol ${pct}% " "$RAY_FG" ;;
+	esac
+}
+
+seg_bat() {
+	for bat in /sys/class/power_supply/BAT*; do
+		[ -r "$bat/capacity" ] || continue
+		pct=$(cat "$bat/capacity")
+		st=$(cat "$bat/status" 2>/dev/null || echo Unknown)
+		case $st in
+		Charging) add bat " bat ${pct}%+ " "$RAY_ACCENT" ;;
+		Discharging)
+			if [ "$pct" -le 15 ]; then
+				add bat " bat ${pct}% " "$RAY_URGENT"
+			else
+				add bat " bat ${pct}% " "$RAY_FG"
+			fi
+			;;
+		*) add bat " bat ${pct}% " "$RAY_DIM" ;;
+		esac
+		return 0
+	done
+}
+
+emit() {
+	out=
+	seg_net
+	seg_vol
+	seg_bat
+	add clock " $(date +'%a %d %b  %H:%M') " "$RAY_FG"
+	printf '[%s]\n' "$out"
+}
+
+case ${1:-} in
+--once)
+	emit
+	exit 0
+	;;
+-h | --help)
+	printf 'usage: status [--once]\n'
+	exit 0
+	;;
+esac
+
+trap 'exit 0' INT TERM
+while :; do
+	emit
+	sleep 2
+done

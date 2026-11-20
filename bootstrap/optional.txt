@@ -1,0 +1,14 @@
+# Rayconfig extras. Installed only with --extras.
+#
+# These are not part of the desktop; they're the things you'd reach for on day
+# two. Keeping them out of the core list is the point.
+noto-fonts-emoji
+polkit-gnome
+neovim
+python
+python-markdown
+poppler
+zathura
+zathura-pdf-mupdf
+alacritty
+playerctl

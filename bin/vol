@@ -1,0 +1,19 @@
+#!/bin/sh
+# vol — volume, without a UI toolkit.
+#
+#   vol up [step] | vol down [step] | vol mute | vol set <0-100>
+set -eu
+
+command -v wpctl >/dev/null 2>&1 || exit 1
+step=${2:-5}
+
+case ${1:-} in
+up) wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ "${step}%+" >/dev/null ;;
+down) wpctl set-volume @DEFAULT_AUDIO_SINK@ "${step}%-" >/dev/null ;;
+mute) wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle >/dev/null ;;
+set) wpctl set-volume @DEFAULT_AUDIO_SINK@ "${2:?percent}/100" >/dev/null ;;
+*)
+	printf 'usage: vol up|down [step] | mute | set <0-100>\n' >&2
+	exit 2
+	;;
+esac
