@@ -112,7 +112,8 @@ stage_preflight() {
 	esac
 
 	for cmd in git; do
-		command -v "$cmd" >/dev/null 2>&1 || die "missing: $cmd"
+		command -v "$cmd" >/dev/null 2>&1 ||
+			die "missing: $cmd — install it first: sudo pacman -S --needed git curl"
 	done
 	ok "git"
 

@@ -54,9 +54,13 @@ git tag -a v0.2.0 -m "…" && git push origin v0.2.0   # then bump this README
 
 ## What it assumes
 
-A **working Arch install with a user and sudo**. It does not partition disks,
-install a bootloader, or set up networking — those are yours, and they should
-be. It installs packages, links configs, renders the theme, and verifies.
+A **working Arch install with a user and sudo**, plus `git` and `curl`
+(`sudo pacman -S --needed git curl` — neither is in Arch's `base` package, so a
+bare archinstall does not have them).
+
+It does not partition disks, install a bootloader, or set up networking — those
+are yours, and they should be. It installs packages, links configs, renders the
+theme, and verifies.
 
 Safe to re-run. Existing non-symlink configs are moved to
 `~/.config-backup/<timestamp>/`, never deleted.
