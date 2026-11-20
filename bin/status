@@ -7,7 +7,6 @@
 # No jq, no modules, no plugin API. Reads sysfs, wpctl, swaymsg.
 set -eu
 
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 STATE=${XDG_STATE_HOME:-$HOME/.local/state}/rayconfig
 
 # shellcheck disable=SC1090,SC1091

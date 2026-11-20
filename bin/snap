@@ -1,0 +1,36 @@
+#!/bin/sh
+# snap — Windows-style window snapping. No plugins, no compositor fork.
+#
+#   snap left|right   half the screen, floating
+#   snap up           maximise
+#   snap down         restore (back to tiling)
+#
+# Sway is a tiler, so "snap" floats the window into a half. For tiling moves
+# use $mod+Shift+arrows.
+set -eu
+
+command -v swaymsg >/dev/null 2>&1 || exit 1
+
+case ${1:-} in
+left)
+	swaymsg floating enable >/dev/null
+	swaymsg resize set width 50 ppt height 100 ppt >/dev/null
+	swaymsg move position 0% 0% >/dev/null
+	;;
+right)
+	swaymsg floating enable >/dev/null
+	swaymsg resize set width 50 ppt height 100 ppt >/dev/null
+	swaymsg move position 50% 0% >/dev/null
+	;;
+up)
+	swaymsg fullscreen enable >/dev/null
+	;;
+down)
+	swaymsg fullscreen disable >/dev/null
+	swaymsg floating disable >/dev/null
+	;;
+-h | --help | *)
+	printf 'usage: snap left|right|up|down\n' >&2
+	exit 2
+	;;
+esac

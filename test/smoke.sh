@@ -75,6 +75,14 @@ else
 	fail "keys produced nothing usable"
 fi
 
+for theme in sunset sunny; do
+	if [ -s "$ROOT/themes/$theme/wallpaper.png" ]; then
+		pass "$theme wallpaper present"
+	else
+		fail "$theme wallpaper missing"
+	fi
+done
+
 printf '\n'
 if [ "$FAIL" -gt 0 ]; then
 	printf '%d failure(s)\n' "$FAIL"

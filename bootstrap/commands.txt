@@ -9,6 +9,7 @@ swayidle
 swaybg
 foot
 fuzzel
+swaybg
 mako
 grim
 slurp

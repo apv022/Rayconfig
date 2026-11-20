@@ -111,11 +111,11 @@ stage_preflight() {
 	*) warn "distro is '$id', not Arch; package names may not resolve" ;;
 	esac
 
-	for cmd in git; do
+	for cmd in git curl; do
 		command -v "$cmd" >/dev/null 2>&1 ||
 			die "missing: $cmd — install it first: sudo pacman -S --needed git curl"
 	done
-	ok "git"
+	ok "git, curl"
 
 	command -v sudo >/dev/null 2>&1 || [ "$(id -u)" -eq 0 ] || die "missing: sudo"
 	if [ "$DRY" = 0 ] && [ "$(id -u)" -ne 0 ]; then
@@ -168,7 +168,8 @@ backup() {
 	local dst=$1
 	[ -e "$dst" ] || [ -L "$dst" ] || return 0
 	[ -L "$dst" ] && return 0 # a symlink costs nothing to replace
-	local dest="$BACKUP_ROOT/$STAMP/$(basename "$dst")"
+	local dest
+	dest="$BACKUP_ROOT/$STAMP/$(basename "$dst")"
 	say "backing up $dst -> $dest"
 	run mkdir -p "$BACKUP_ROOT/$STAMP"
 	run mv "$dst" "$dest"
@@ -253,7 +254,7 @@ stage_done() {
                                          ray update
 
   configs:  $CFG/{sway,foot,mako,fuzzel}
-  scripts:  $LOCAL_BIN/{ray,status,theme,gen-theme,doctor,keys,vol,bright,shot}
+  scripts:  $LOCAL_BIN/{ray,status,theme,gen-theme,doctor,keys,vol,bright,shot,snap,winlist}
   theme:    themes/$THEME/palette  (edit, then: ray theme $THEME)
   backups:  $BACKUP_ROOT
 EOF

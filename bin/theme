@@ -6,7 +6,7 @@
 #   theme toggle
 set -eu
 
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 STATE=${XDG_STATE_HOME:-$HOME/.local/state}/rayconfig
 
 cur=$(cat "$STATE/theme" 2>/dev/null || echo sunset)
@@ -33,5 +33,12 @@ if command -v swaymsg >/dev/null 2>&1 && swaymsg -t get_version >/dev/null 2>&1;
 	swaymsg reload >/dev/null 2>&1 && printf 'reloaded: sway\n'
 fi
 command -v makoctl >/dev/null 2>&1 && makoctl reload >/dev/null 2>&1 && printf 'reloaded: mako\n'
+
+# swaybg is started from the sway config; restart it on a theme switch.
+if command -v swaybg >/dev/null 2>&1 && [ -f "$STATE/wallpaper.png" ]; then
+	pkill -x swaybg >/dev/null 2>&1 || true
+	swaybg -i "$STATE/wallpaper.png" -m fill >/dev/null 2>&1 &
+	printf 'reloaded: wallpaper\n'
+fi
 
 printf 'theme: %s (new foot windows pick up the palette)\n' "$next"

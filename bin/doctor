@@ -55,7 +55,7 @@ for d in sway foot mako fuzzel; do
 		bad "$link missing — run: install.sh --only link"
 	fi
 done
-for f in ray status theme gen-theme doctor keys vol bright shot; do
+for f in ray status theme gen-theme doctor keys vol bright shot snap winlist; do
 	if [ -x "$LOCAL_BIN/$f" ]; then
 		PASS=$((PASS + 1))
 	else
@@ -100,6 +100,11 @@ for out in \
 done
 [ "$present" -eq 0 ] || good "$present generated file(s) present"
 [ "$stale" -eq 0 ] || meh "$stale generated file(s) older than the palette — run: ray theme $THEME"
+if [ -f "$STATE/wallpaper.png" ]; then
+	good "wallpaper: $(basename "$(readlink -f "$STATE/wallpaper.png")")"
+else
+	bad "wallpaper missing — run: ray theme $THEME"
+fi
 
 head_ "sway"
 if command -v sway >/dev/null 2>&1; then

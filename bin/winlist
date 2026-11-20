@@ -1,0 +1,37 @@
+#!/bin/sh
+# winlist — Alt-Tab, but it is fuzzel and forty lines of awk.
+#
+#   winlist        pick a window, focus it
+set -eu
+
+command -v swaymsg >/dev/null 2>&1 || exit 1
+command -v fuzzel >/dev/null 2>&1 || exit 1
+
+tmp=$(mktemp)
+trap 'rm -f "$tmp"' EXIT
+
+# One JSON object per line, then pull the three fields we care about. Sway
+# emits stable field order, so a line is one container.
+swaymsg -t get_tree -r |
+	sed 's/},{/}\n{/g' |
+	awk '
+	{
+		id = ""; app = ""; name = ""
+		if (match($0, /"id":[0-9]+/))            id   = substr($0, RSTART + 5,  RLENGTH - 5)
+		if (match($0, /"app_id":"[^"]*"/))       app  = substr($0, RSTART + 10, RLENGTH - 11)
+		if (match($0, /"name":"[^"]*"/))         name = substr($0, RSTART + 8,  RLENGTH - 9)
+		if (id != "" && app != "" && name != "") {
+			gsub(/\t/, " ", name)
+			printf "%s\t%s  %s\n", id, app, name
+		}
+	}' >"$tmp"
+
+[ -s "$tmp" ] || exit 0
+
+sel=$(cut -f2- "$tmp" | fuzzel --dmenu --prompt "window: " --width 60 --lines 12) || exit 0
+[ -n "$sel" ] || exit 0
+
+id=$(awk -F'\t' -v want="$sel" '$2 == want {print $1; exit}' "$tmp")
+[ -n "$id" ] || exit 0
+
+swaymsg "[con_id=$id]" focus >/dev/null

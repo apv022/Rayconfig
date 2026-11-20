@@ -4,13 +4,17 @@
 # The only file you pipe to sh. Deliberately tiny: the auditable logic lives in
 # the repo, not in the thing you curl.
 #
-#   curl -fsSL .../install.sh | sh
+#   curl -fsSL .../install.sh | sh          # on the Arch ISO: installs everything
+#   curl -fsSL .../install.sh | sh          # on Arch: installs the desktop
 #   ./install.sh --dry-run
 #
-# It installs the repo itself to ~/.local/share/rayconfig (override with
-# RAYCONFIG_DIR) and runs the installer from there. That matters: the dotfile
-# symlinks point into this directory, so it has to outlive the process. A
-# temp-dir clone would leave you with dangling configs.
+# Two modes, picked automatically:
+#
+#   archiso  -> bootstrap/iso-install.sh: partitions, pacstraps, bootloader,
+#               user, then Rayconfig. DESTROYS the target disk. Asks first.
+#   Arch     -> installs the repo to ~/.local/share/rayconfig and runs the
+#               config installer from there. Symlinks point into that
+#               directory, so it has to outlive the process.
 #
 # Override with: RAYCONFIG_REPO, RAYCONFIG_REF, RAYCONFIG_DIR
 
@@ -26,14 +30,28 @@ die() {
 	exit 1
 }
 
-# Already inside a checkout? Use it as-is.
-here=$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd || echo .)
+command -v git >/dev/null 2>&1 || die "git is required (pacman -S --needed git curl)"
+
+# --- mode 1: live ISO -------------------------------------------------------
+if [ -d /run/archiso ] && [ "$(id -u)" -eq 0 ]; then
+	say "archiso detected: installing Arch + Rayconfig"
+	say "this erases one disk — you will be asked which"
+	tmp=$(mktemp -d)
+	# shellcheck disable=SC2064
+	trap "rm -rf '$tmp'" EXIT INT TERM HUP
+	git clone --quiet --depth 1 --branch "$REF" "$REPO" "$tmp/rayconfig" ||
+		die "could not clone $REPO ($REF)"
+	"$tmp/rayconfig/bootstrap/iso-install.sh" "$@"
+	exit 0
+fi
+
+# --- mode 2: existing checkout ---------------------------------------------
+here=$(CDPATH='' cd -- "$(dirname -- "$0")" 2>/dev/null && pwd || echo .)
 if [ -f "$here/bootstrap/install.sh" ] && [ -d "$here/themes" ]; then
 	exec "$here/bootstrap/install.sh" "$@"
 fi
 
-command -v git >/dev/null 2>&1 || die "git is required"
-
+# --- mode 3: existing Arch system ------------------------------------------
 if [ -d "$DEST/.git" ]; then
 	say "updating $DEST"
 	# ff-only: never merge or discard local work. A dirty tree is a warning,

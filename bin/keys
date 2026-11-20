@@ -3,7 +3,7 @@
 # Nothing to maintain: describe a bind with a '# comment' above it.
 set -eu
 
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 binds=$ROOT/dots/sway/config.d/30-binds.conf
 
 [ -f "$binds" ] || {
