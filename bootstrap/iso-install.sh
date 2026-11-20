@@ -93,7 +93,7 @@ part() { # disk index -> partition device
 
 fail_trap() {
 	printf '\n%sinstall failed%s — the disk has already been modified.\n' "$R" "$Z" >&2
-	printf 'log: /tmp/rayconfig-iso.log\n' >&2
+	printf 'see the error above; the complete command is echoed in --dry-run.\n' >&2
 	printf 're-run the same command, or reboot into the ISO and retry.\n' >&2
 }
 trap fail_trap ERR
@@ -340,7 +340,11 @@ if [ "$DRY" = 1 ]; then
 else
 	mkdir -p "$TARGET"
 	cp -a "$REPO_SRC/." "$TARGET/"
-	chown -R "$NEWUSER:$NEWUSER" "/mnt/home/$NEWUSER/.local"
+	# chown must run INSIDE the chroot: the ISO's /etc/passwd has no $NEWUSER.
+	arch-chroot /mnt id -u "$NEWUSER" >/dev/null 2>&1 ||
+		die "user $NEWUSER was not created in the new system"
+	arch-chroot /mnt chown -R "$NEWUSER:$NEWUSER" "/home/$NEWUSER/.local"
+	ok "repo owned by $NEWUSER"
 	# Temporary passwordless sudo so the config stage can use pacman. Removed
 	# again immediately after; nothing about it survives the install.
 	printf '%%wheel ALL=(ALL:ALL) NOPASSWD: ALL\n' >/mnt/etc/sudoers.d/99-rayconfig-tmp
