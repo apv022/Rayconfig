@@ -17,7 +17,7 @@ themes/<name>/palette  ──►  bin/gen-theme  ──►  every config that ha
 Read it first. It's a shell script that runs sudo.
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/apv022/Rayconfig/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/apv022/Rayconfig/refs/tags/v0.1.0/install.sh | sh
 ```
 
 From a checkout instead:
@@ -35,6 +35,22 @@ The repo installs itself to `~/.local/share/rayconfig` and symlinks your
 configs into it, so that directory is the live system — `ray update` is a
 `git pull` plus a re-link. Set `RAYCONFIG_DIR` to put it elsewhere. Never run
 the installer from a temp checkout; it refuses.
+
+### Why the URL has a tag in it
+
+`raw.githubusercontent.com` is served by Fastly with `cache-control: max-age=300`
+and it does not treat a query string as a different object, so `?v=2` does
+**not** bust it. A `/main/` URL can and does serve a five-minute-stale installer
+— which is how you end up running a version that symlinks your configs into a
+`mktemp` directory.
+
+So the documented URL is pinned to an immutable ref. The bootstrap script is
+frozen at that tag; the code it installs is still the newest `main` (or
+`RAYCONFIG_REF`). Releasing:
+
+```sh
+git tag -a v0.2.0 -m "…" && git push origin v0.2.0   # then bump this README
+```
 
 ## What it assumes
 
