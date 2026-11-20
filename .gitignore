@@ -8,3 +8,4 @@ dots/sway/config.d/90-local.conf
 
 *.tmp
 *.swp
+__pycache__/

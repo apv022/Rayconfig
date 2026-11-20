@@ -19,7 +19,7 @@ themes/<name>/palette  ──►  bin/gen-theme  ──►  every config that ha
 Boot the Arch ISO, connect to the network (`iwctl` for wifi), then:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/apv022/Rayconfig/refs/tags/v0.2.3/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/apv022/Rayconfig/refs/tags/v0.2.4/install.sh | sh
 ```
 
 It detects archiso and runs `bootstrap/iso-install.sh`, which:
@@ -48,7 +48,7 @@ The same URL, no flags: it detects that you are not on the ISO and only
 installs the desktop (packages, configs, theme, verify).
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/apv022/Rayconfig/refs/tags/v0.2.3/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/apv022/Rayconfig/refs/tags/v0.2.4/install.sh | sh
 ./install.sh --dry-run
 ./install.sh --check
 ```
@@ -152,6 +152,13 @@ ray keys          # cheat sheet
 - OSD for volume/brightness via mako.
 - Rounded corners / blur are not possible without swayfx (a sway fork, AUR).
   Deliberately left out.
+
+## Working on the repo
+
+Read `CLAUDE.md` (also linked as `AGENTS.md`) before changing anything. It has
+the ethos, the non-negotiables, the landmines already hit, and the exact
+verification commands. Do not "improve" the design by adding plugins, a bar
+framework, AUR packages or a second source of truth for colour.
 
 ## License
 
