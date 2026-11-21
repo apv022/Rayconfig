@@ -14,7 +14,7 @@ already up (`iwctl` for wifi). It cannot be run from a devbox, container or SSH
 session: `bootstrap/iso-install.sh` wipes a disk.
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/apv022/Rayconfig/refs/tags/v0.3.0/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/apv022/Rayconfig/refs/tags/v0.2.4/install.sh | sh
 # reboot, log in at tty1, then:
 # sway starts on tty1 login via /etc/profile.d/10-rayconfig.sh (else: `sway`, NOT `sway exec`)
 ray doctor      # must be clean (the "not inside sway" warning from a TTY is expected)
