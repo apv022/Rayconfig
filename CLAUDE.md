@@ -118,7 +118,8 @@ first — that is a missing render step, not a bad config.
   Keep `## section` and one `# description` above each group of bindsyms.
 - **Broadcom wifi on the ISO** (BCM4352 etc.): `b43` binds but no `wlan0`
   exists; the ISO cannot do wifi at all. Install over USB tethering/ethernet;
-  iso-install adds `broadcom-wl` when it sees the PCI id.
+  iso-install adds `broadcom-wl` (or `broadcom-wl-dkms` + headers),
+  whichever the repos have, when it sees the PCI id.
 - **Tool detection**: `curl` and `git` are not in Arch's `base` package. A bare
   archinstall cannot fetch this installer.
 

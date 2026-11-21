@@ -242,8 +242,18 @@ esac
 # driver can't run these, so no wlan0 ever appears. broadcom-wl is the
 # official-repo proprietary driver; it blacklists b43/bcma itself.
 if lspci -n 2>/dev/null | grep -qiE '14e4:(4311|4312|4313|4315|4328|4329|432a|432b|432c|432d|4353|4357|4358|4359|4360|4365|43a0|43b1|43b2)'; then
-	PKGS+=(broadcom-wl)
-	say "Broadcom wifi detected: adding broadcom-wl"
+	# Ask the repos instead of guessing: the prebuilt package has come and
+	# gone; the dkms one builds against linux-headers. Never abort over wifi.
+	pacman -Sy --noconfirm >/dev/null 2>&1 || true
+	if pacman -Si broadcom-wl >/dev/null 2>&1; then
+		PKGS+=(broadcom-wl)
+		say "Broadcom wifi detected: adding broadcom-wl"
+	elif pacman -Si broadcom-wl-dkms >/dev/null 2>&1; then
+		PKGS+=(broadcom-wl-dkms linux-headers)
+		say "Broadcom wifi detected: adding broadcom-wl-dkms + linux-headers"
+	else
+		warn "Broadcom wifi detected but no broadcom-wl package in the repos; wifi will need a driver after install"
+	fi
 fi
 if [ "$UEFI" = 1 ]; then
 	PKGS+=(efibootmgr)
