@@ -3,9 +3,8 @@
 Read `README.md` first. This file is the part that is hard to infer from the
 code: the ethos, the invariants, the trap doors, and how to verify a change.
 
-An installed system is a git checkout at `~/.local/share/rayconfig`. The pinned
-tag in the README controls only the ~50-line bootstrap entry; the repo itself
-follows `main` via `git pull --ff-only`.
+An installed system is a git checkout at `~/.local/share/rayconfig` that
+follows `main` via `git pull --ff-only`. There are no releases or tags.
 
 ## One-shot runbook
 
@@ -14,7 +13,7 @@ already up (`iwctl` for wifi). It cannot be run from a devbox, container or SSH
 session: `bootstrap/iso-install.sh` wipes a disk.
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/apv022/Rayconfig/refs/tags/v0.2.4/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/apv022/Rayconfig/refs/heads/main/install.sh | sh
 # reboot, log in at tty1, then:
 # sway starts on tty1 login via /etc/profile.d/10-rayconfig.sh (else: `sway`, NOT `sway exec`)
 ray doctor      # must be clean (the "not inside sway" warning from a TTY is expected)
@@ -56,10 +55,10 @@ features.
 9. **Mod is Windows.** Super+Left/Right snap, Up/Down maximise/restore, Tab
    window picker, E files, L lock. vim-style h/j/k/l focus belongs in the
    user's gitignored `90-local.conf`, not in the defaults.
-10. **The bootstrap URL is pinned to a tag.** Never switch the README to
-    `/main/`: raw.githubusercontent is Fastly-cached at `max-age=300` and query
-    strings do not bust it, so a branch URL can serve a stale installer for
-    five minutes. Release = new tag + bump the README.
+10. **No versions.** The install URL is `/main/`. raw.githubusercontent caches
+    for up to 5 minutes, so right after editing `install.sh` itself, wait a few
+    minutes before testing a fresh install. Everything else is pulled from
+    `main` by git and is never stale.
 
 ## Layout and the editing rule
 

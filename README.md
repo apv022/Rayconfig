@@ -19,7 +19,7 @@ themes/<name>/palette  ──►  bin/gen-theme  ──►  every config that ha
 Boot the Arch ISO, connect to the network (`iwctl` for wifi), then:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/apv022/Rayconfig/refs/tags/v0.2.4/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/apv022/Rayconfig/refs/heads/main/install.sh | sh
 ```
 
 It detects archiso and runs `bootstrap/iso-install.sh`, which:
@@ -49,7 +49,7 @@ The same URL, no flags: it detects that you are not on the ISO and only
 installs the desktop (packages, configs, theme, verify).
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/apv022/Rayconfig/refs/tags/v0.2.4/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/apv022/Rayconfig/refs/heads/main/install.sh | sh
 ./install.sh --dry-run
 ./install.sh --check
 ```
@@ -62,15 +62,9 @@ into it, so that directory is the live system — `ray update` is a `git pull` p
 a re-link. Set `RAYCONFIG_DIR` to put it elsewhere. Never run the installer from
 a temp checkout; it refuses.
 
-The URL is pinned to a tag on purpose. `raw.githubusercontent.com` is
-Fastly-cached with `max-age=300` and ignores query strings in its cache key, so
-a `/main/` URL can serve a stale installer for five minutes. A tag URL cannot.
-The bootstrap itself is frozen at that tag; the code it installs is still the
-newest `main` (or `RAYCONFIG_REF`). Releasing:
-
-```sh
-git tag -a vX.Y.Z -m "…" && git push origin vX.Y.Z   # then bump this README
-```
+There are no versions: the URL, the installer and `ray update` all follow `main`.
+GitHub caches the raw file for up to 5 minutes, so right after you change
+`install.sh` itself, a fresh install may get the old copy briefly.
 
 ## Installed system
 
