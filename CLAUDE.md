@@ -116,6 +116,9 @@ first — that is a missing render step, not a bad config.
   first line, or swaybar renders the raw JSON as text.
 - **Cheat sheet source**: `30-binds.conf` comments are parsed by `bin/keys`.
   Keep `## section` and one `# description` above each group of bindsyms.
+- **Broadcom wifi on the ISO** (BCM4352 etc.): `b43` binds but no `wlan0`
+  exists; the ISO cannot do wifi at all. Install over USB tethering/ethernet;
+  iso-install adds `broadcom-wl` when it sees the PCI id.
 - **Tool detection**: `curl` and `git` are not in Arch's `base` package. A bare
   archinstall cannot fetch this installer.
 

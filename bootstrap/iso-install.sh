@@ -238,6 +238,13 @@ case $(grep -m1 '^vendor_id' /proc/cpuinfo | awk '{print $3}') in
 *Intel*) PKGS+=(intel-ucode) ;;
 *AMD*) PKGS+=(amd-ucode) ;;
 esac
+# Broadcom BCM43xx wifi (Dell DW1560/1830, many MacBooks): the ISO's b43
+# driver can't run these, so no wlan0 ever appears. broadcom-wl is the
+# official-repo proprietary driver; it blacklists b43/bcma itself.
+if lspci -n 2>/dev/null | grep -qiE '14e4:(4311|4312|4313|4315|4328|4329|432a|432b|432c|432d|4353|4357|4358|4359|4360|4365|43a0|43b1|43b2)'; then
+	PKGS+=(broadcom-wl)
+	say "Broadcom wifi detected: adding broadcom-wl"
+fi
 if [ "$UEFI" = 1 ]; then
 	PKGS+=(efibootmgr)
 else
