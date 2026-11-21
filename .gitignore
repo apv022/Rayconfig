@@ -10,3 +10,4 @@ dots/sway/config.d/90-local.conf
 *.swp
 __pycache__/
 dots/swaylock/config
+dots/sway/config.d/85-settings.conf

@@ -33,9 +33,9 @@ seg_net() {
 			if command -v iw >/dev/null 2>&1; then
 				ssid=$(iw dev "$name" link 2>/dev/null | awk '/SSID/ {print $2; exit}')
 			fi
-			add net " ${ssid:-wifi} " "$RAY_ACCENT"
+			add net " ${ssid:-wifi} " "$RAY_FG"
 		else
-			add net " net " "$RAY_ACCENT"
+			add net " wired " "$RAY_FG"
 		fi
 		return 0
 	done
@@ -48,7 +48,7 @@ seg_vol() {
 	pct=$(printf '%s' "$raw" | awk '{printf "%d", $2 * 100}')
 	case $raw in
 	*MUTED*) add vol " vol mute " "$RAY_URGENT" ;;
-	*) add vol " vol ${pct}% " "$RAY_FG" ;;
+	*) add vol " vol ${pct}% " "$RAY_DIM" ;;
 	esac
 }
 
@@ -63,7 +63,7 @@ seg_bat() {
 			if [ "$pct" -le 15 ]; then
 				add bat " bat ${pct}% " "$RAY_URGENT"
 			else
-				add bat " bat ${pct}% " "$RAY_FG"
+				add bat " bat ${pct}% " "$RAY_DIM"
 			fi
 			;;
 		*) add bat " bat ${pct}% " "$RAY_DIM" ;;

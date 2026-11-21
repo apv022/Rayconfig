@@ -1,0 +1,17 @@
+# dusk (dark): violet evening, rose and peach
+bg=#15141b
+bg2=#1d1c25
+bg3=#2b2936
+fg=#e2dfec
+dim=#807c93
+sun=#f0c38e
+amber=#e6a87c
+orange=#e88f7a
+red=#e06c84
+green=#9ccfa0
+teal=#8fc7cf
+blue=#8ea8e8
+purple=#c4a0e6
+accent=#c4a0e6
+urgent=#e06c84
+variant=dark

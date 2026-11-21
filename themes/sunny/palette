@@ -1,17 +1,17 @@
-# Rayconfig palette: sunny (light)
-bg=#fff7e0
-bg2=#fdecc0
-bg3=#f6dfa0
-fg=#4b3a26
-dim=#a8946f
-sun=#f2a900
-amber=#b87a00
-orange=#d9631a
-red=#a50f2d
-green=#7c8a1e
-teal=#2f8a7c
-blue=#3d7ea6
-purple=#8c0f2e
-accent=#b87a00
-urgent=#a50f2d
+# sunny (light): paper and ink, warm accents
+bg=#f6f0e6
+bg2=#ece4d6
+bg3=#ddd2bf
+fg=#3d342b
+dim=#8d8172
+sun=#b8860b
+amber=#a8701c
+orange=#b8572a
+red=#a83a3a
+green=#687d2a
+teal=#3f7f72
+blue=#3f6f9a
+purple=#8a4a78
+accent=#a8701c
+urgent=#a83a3a
 variant=light

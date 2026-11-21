@@ -2,10 +2,14 @@
 bar {
 	status_command ~/.local/bin/status
 	position top
-	height 26
-	tray_output none
+	height 30
+	font pango:JetBrains Mono 10
+	status_padding 6
+	status_edge_padding 10
+	workspace_min_width 30
+	tray_padding 4
 	workspace_buttons yes
-	strip_workspace_numbers no
+	strip_workspace_numbers yes
 	binding_mode_indicator yes
 
 	colors {
@@ -13,10 +17,10 @@ bar {
 		statusline @fg@
 		separator  @bg3@
 
-		focused_workspace  @accent@ @accent@ @bg@
-		active_workspace   @bg3@    @bg3@    @fg@
+		focused_workspace  @bg3@    @bg3@    @accent@
+		active_workspace   @bg2@    @bg2@    @fg@
 		inactive_workspace @bg@     @bg@     @dim@
 		urgent_workspace   @urgent@ @urgent@ @bg@
-		binding_mode       @sun@    @sun@    @bg@
+		binding_mode       @bg3@    @bg3@    @sun@
 	}
 }

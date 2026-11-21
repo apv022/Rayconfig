@@ -10,7 +10,8 @@ CFG=${XDG_CONFIG_HOME:-$HOME/.config}
 STATE=${XDG_STATE_HOME:-$HOME/.local/state}/rayconfig
 LOCAL_BIN=$HOME/.local/bin
 BACKUP_ROOT=$HOME/.config-backup
-THEME=${RAYCONFIG_THEME:-sunset}
+# keep the theme the user picked; re-running must never reset it
+THEME=${RAYCONFIG_THEME:-$(cat "$STATE/theme" 2>/dev/null || echo sunset)}
 SUDO=(sudo)
 
 ALL_STAGES=(preflight packages link solarvim theme services verify)
@@ -32,7 +33,7 @@ usage: install.sh [options]
   --yes          don't prompt
   --extras       also install bootstrap/optional.txt
   --services     enable system units (bluetooth)
-  --theme NAME   sunset (default) or sunny
+  --theme NAME   sunset (default), sunny, dusk, moss
 
 stages: preflight packages link solarvim theme services verify
 EOF
@@ -155,6 +156,22 @@ stage_packages() {
 	run "${SUDO[@]}" pacman -Syu --needed --noconfirm "${pkgs[@]}"
 	ok "${#pkgs[@]} packages"
 
+	# Settings TUIs: one at a time so a renamed/removed package can't block
+	# the rest. Already-installed ones cost nothing (--needed).
+	local t got=0 miss=()
+	while IFS= read -r t; do
+		if run "${SUDO[@]}" pacman -S --needed --noconfirm "$t" >/dev/null 2>&1; then
+			got=$((got + 1))
+		else
+			miss+=("$t")
+		fi
+	done < <(grep -vE '^[[:space:]]*(#|$)' "$ROOT/bootstrap/tuis.txt")
+	ok "$got settings apps"
+	[ ${#miss[@]} -eq 0 ] || warn "not in the repos, using fallbacks: ${miss[*]}"
+	if [ "$DRY" = 0 ] && systemctl list-unit-files power-profiles-daemon.service >/dev/null 2>&1; then
+		"${SUDO[@]}" systemctl enable --now power-profiles-daemon.service >/dev/null 2>&1 || true
+	fi
+
 	if [ "$EXTRAS" = 1 ]; then
 		local extra=()
 		mapfile -t extra < <(grep -vE '^[[:space:]]*(#|$)' "$ROOT/bootstrap/optional.txt")
@@ -234,6 +251,7 @@ stage_theme() {
 	say "theme: $THEME"
 	[ -d "$ROOT/themes/$THEME" ] || die "no such theme: $THEME (have: $(ls "$ROOT/themes" | tr '\n' ' '))"
 	run "$ROOT/bin/gen-theme" "$THEME"
+	run "$ROOT/bin/ray" _render
 	ok "rendered from themes/$THEME/palette"
 }
 

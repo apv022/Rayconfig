@@ -12,7 +12,7 @@ STATE=${XDG_STATE_HOME:-$HOME/.local/state}/rayconfig
 cur=$(cat "$STATE/theme" 2>/dev/null || echo sunset)
 case ${1:-} in
 '' | -h | --help)
-	printf 'usage: theme <sunset|sunny|toggle>\n' >&2
+	printf 'usage: theme <%s|toggle>\n' "$(ls "$ROOT/themes" | tr '\n' '|' | sed 's/|$//')" >&2
 	exit 2
 	;;
 toggle)
@@ -34,11 +34,13 @@ if command -v swaymsg >/dev/null 2>&1 && swaymsg -t get_version >/dev/null 2>&1;
 fi
 command -v makoctl >/dev/null 2>&1 && makoctl reload >/dev/null 2>&1 && printf 'reloaded: mako\n'
 
-# swaybg is started from the sway config; restart it on a theme switch.
-if command -v swaybg >/dev/null 2>&1 && [ -f "$STATE/wallpaper.png" ]; then
-	pkill -x swaybg >/dev/null 2>&1 || true
-	swaybg -i "$STATE/wallpaper.png" -m fill >/dev/null 2>&1 &
-	printf 'reloaded: wallpaper\n'
+# GTK/Chromium/Electron apps (Brave, Firefox file pickers) follow this.
+if command -v gsettings >/dev/null 2>&1; then
+	case $(sed -n 's/^variant=//p' "$ROOT/themes/$next/palette") in
+	light) gsettings set org.gnome.desktop.interface color-scheme prefer-light 2>/dev/null || true ;;
+	*) gsettings set org.gnome.desktop.interface color-scheme prefer-dark 2>/dev/null || true ;;
+	esac
 fi
+command -v notify-send >/dev/null 2>&1 && notify-send -a ray "Theme" "$next" || true
 
 printf 'theme: %s (new foot windows pick up the palette)\n' "$next"

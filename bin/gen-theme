@@ -49,8 +49,15 @@ load() { # palette-file suffix outfile
 }
 
 load "$RENDER/themes/$theme/palette" "" "$cur"
-load "$RENDER/themes/sunset/palette" "_dark" "$dart"
-load "$RENDER/themes/sunny/palette" "_light" "$lite"
+# The editor carries a dark and a light variant: the active theme fills its
+# own side, sunset/sunny fill the other.
+tvar=$(sed -n 's/^variant=//p' "$RENDER/themes/$theme/palette" | head -n1)
+darkp=$RENDER/themes/sunset/palette
+lightp=$RENDER/themes/sunny/palette
+[ "$tvar" = dark ] && darkp=$RENDER/themes/$theme/palette
+[ "$tvar" = light ] && lightp=$RENDER/themes/$theme/palette
+load "$darkp" "_dark" "$dart"
+load "$lightp" "_light" "$lite"
 printf 'theme=%s\n' "$theme" >>"$cur"
 
 # foot 1.26+ renamed [colors] to [colors-dark]/[colors-light]. Pick the section

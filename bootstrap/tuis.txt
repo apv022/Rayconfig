@@ -1,0 +1,15 @@
+# Settings apps (terminal UIs) behind Super+I. Installed one by one, best
+# effort: a package missing from the official repos is skipped, and the
+# settings hub falls back to a tool that always ships (nmtui, bluetoothctl,
+# alsamixer, top). Official repos only, no AUR.
+impala
+bluetui
+wiremix
+bluez
+bluez-utils
+alsa-utils
+btop
+wlsunset
+power-profiles-daemon
+yazi
+fastfetch

@@ -7,8 +7,6 @@ include ~/.config/sway/config.d/*.conf
 # it portals (screen sharing, file pickers) and user services can't find sway.
 include /etc/sway/config.d/*
 
-# wallpaper (generated from the palette; `ray theme` restarts it)
-exec swaybg -i ~/.local/state/rayconfig/wallpaper.png -m fill
 # notifications
 exec mako
 # lock after 5 min, screen off after 10, always lock before sleep
@@ -16,5 +14,5 @@ exec swayidle -w \
 	timeout 300 'swaylock -f' \
 	timeout 600 'swaymsg "output * power off"' resume 'swaymsg "output * power on"' \
 	before-sleep 'swaylock -f'
-# say hello once per login
-exec sh -c 'sleep 3; exec ~/.local/bin/ray hello'
+# night light if enabled, and a hello on first login
+exec sh -c 'sleep 3; exec ~/.local/bin/ray startup'

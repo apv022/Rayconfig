@@ -82,14 +82,55 @@ GitHub caches the raw file for up to 5 minutes, so right after you change
 you maintain forever. Writing your own means owning a VT parser. `foot` is the
 st of Wayland. Alacritty is available with `--extras` if you want to A/B it.
 
+## Settings without the command line
+
+`Super+I` opens the settings hub, a small floating list. Every item opens a
+graphical picker or a terminal app in a floating window:
+
+| setting | opens |
+|---|---|
+| Wi-Fi | `impala`, else `nmtui` |
+| Bluetooth | `bluetui`, else `bluetoothctl` (starts the service for you) |
+| Sound | `wiremix`, else `pulsemixer` / `alsamixer` |
+| Display | pick a screen → scale or resolution |
+| Theme | sunset · sunny · dusk · moss (wallpaper, bar, terminal, lock, editor, GTK apps) |
+| Wallpaper | any image in `~/Pictures/wallpapers`, or the theme's |
+| Keyboard layout, Touchpad | pick from a list |
+| Night light, Power profile | `wlsunset`, `power-profiles-daemon` |
+| Updates, System monitor | `ray update`, `btop` |
+| Ask an agent | Claude Code inside this repo (or claude.ai/code) |
+
+Choices are stored in `~/.local/state/rayconfig/settings` (plain `key=value`)
+and rendered to `dots/sway/config.d/85-settings.conf` (gitignored), so they
+survive updates and you can still read every line.
+
+## Omarchy, taken apart
+
+[Omarchy](https://omarchy.org) gets the *experience* right: one command to a
+finished desktop, menus for everything, themes that restyle every app at once,
+TUIs instead of GTK settings panels, one-key updates. Rayconfig keeps that
+experience and drops the parts that cost ownership:
+
+| Omarchy | Rayconfig |
+|---|---|
+| Hyprland (plugin ecosystem) | sway — bar, lock, idle and wallpaper ship in the box |
+| Waybar, Walker, SwayOSD, hypr* daemons | `swaybar` + a 100-line `status` script, `fuzzel`, `mako` |
+| AUR helpers + AUR packages | official repos only; optional TUIs are skipped if missing |
+| ~100 `omarchy-*` scripts | `ray` + ~10 helpers; settings are one function each |
+| a theme = copies of every app's config | a theme = one 16-line palette, everything rendered from it |
+| bundled apps (web apps, Docker, Typora…) | nothing you didn't ask for; install what you want |
+| migrations framework for updates | `ray update`: git pull, then re-run the idempotent installer |
+| Neovim via LazyVim (dozens of plugins) | solarvim: one file, zero plugins |
+
 ## Everyday use
 
 | | |
 |---|---|
 | `Super+/` | **cheat sheet** — every desktop and editor shortcut, generated from the configs |
-| `Super+Alt+Space` | menu: update, theme, keys, doctor, lock, suspend, reboot, power off |
+| `Super+I` | settings |
+| `Super+Alt+Space` | menu: settings, update, shortcuts, agent, lock, power |
 | `Super+Escape` | power menu |
-| `ray update` | updates Arch, rayconfig and solarvim, re-renders, checks, tells you if a reboot is due |
+| `ray update` | pulls rayconfig + solarvim, then updates Arch and installs anything new — on the running system, no reinstall |
 | bar | shows `↑ N updates` when Arch has updates (checked every 30 min) |
 
 Mod is Super and behaves like Windows: `Super+Left/Right` snap, `Up/Down`
@@ -129,7 +170,7 @@ On an existing Arch box, log in on a TTY and type `sway`.
 ```sh
 ray doctor        # health check, read-only
 ray update        # everything up to date
-ray theme sunny   # or sunset, or toggle — also swaps wallpaper, lock screen, editor
+ray theme dusk    # sunset | sunny | dusk | moss | toggle
 ray keys          # cheat sheets (sway | vim)
 ray edit          # open the repo in solarvim
 ```

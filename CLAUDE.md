@@ -66,7 +66,8 @@ features.
 install.sh                 mode detection: archiso -> full disk, Arch -> config
 bootstrap/iso-install.sh   partitioning, pacstrap, bootloader, user, handoff
 bootstrap/install.sh       stages: preflight packages link solarvim theme services verify
-bin/                       ray (update, menu, keys…) + ~10 tiny helpers
+bin/                       ray (settings, update, menu, keys, ask) + ~10 tiny helpers
+bootstrap/tuis.txt         settings TUIs, installed one by one, missing ones skipped
                            solarvim is cloned to ~/.local/share/solarvim by the `solarvim` stage
 dots/                      hand-written configs; *.in are templates
 templates/                 outputs outside the repo (solarvim ray.lua)
@@ -120,6 +121,11 @@ first — that is a missing render step, not a bad config.
   exists; the ISO cannot do wifi at all. Install over USB tethering/ethernet;
   iso-install adds `broadcom-wl` (or `broadcom-wl-dkms` + headers),
   whichever the repos have, when it sees the PCI id.
+- **Settings are state, not config**: `ray settings` writes
+  `~/.local/state/rayconfig/settings` and renders `85-settings.conf`. Never
+  make a menu edit a tracked file.
+- **`ray update` re-execs itself** after `git pull`, so new update logic runs
+  in the same invocation. An install older than that needs `ray update` twice.
 - **Tool detection**: `curl` and `git` are not in Arch's `base` package. A bare
   archinstall cannot fetch this installer.
 

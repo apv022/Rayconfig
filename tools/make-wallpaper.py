@@ -35,7 +35,10 @@ def read_palette(path):
             if not line or line.startswith("#"):
                 continue
             k, v = line.split("=", 1)
-            v = v.strip().lstrip("#")
+            v = v.strip()
+            if not v.startswith("#"):
+                continue  # variant=dark etc.
+            v = v.lstrip("#")
             pal[k.strip()] = tuple(int(v[i:i + 2], 16) for i in (0, 2, 4))
     return pal
 

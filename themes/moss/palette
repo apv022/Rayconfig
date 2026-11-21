@@ -1,0 +1,17 @@
+# moss (dark): forest greens, soft and low-contrast
+bg=#141713
+bg2=#1b1f1a
+bg3=#283026
+fg=#dfe3d4
+dim=#7f8a78
+sun=#d8c37a
+amber=#c9a96a
+orange=#d48c62
+red=#cf6a63
+green=#a7c080
+teal=#83c092
+blue=#7fbbb3
+purple=#d699b6
+accent=#a7c080
+urgent=#cf6a63
+variant=dark
