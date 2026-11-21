@@ -14,9 +14,9 @@ already up (`iwctl` for wifi). It cannot be run from a devbox, container or SSH
 session: `bootstrap/iso-install.sh` wipes a disk.
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/apv022/Rayconfig/refs/tags/v0.2.4/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/apv022/Rayconfig/refs/tags/v0.3.0/install.sh | sh
 # reboot, log in at tty1, then:
-sway            # NOT `sway exec` — that is the IPC client form
+# sway starts on tty1 login via /etc/profile.d/10-rayconfig.sh (else: `sway`, NOT `sway exec`)
 ray doctor      # must be clean (the "not inside sway" warning from a TTY is expected)
 ```
 
@@ -66,8 +66,9 @@ features.
 ```
 install.sh                 mode detection: archiso -> full disk, Arch -> config
 bootstrap/iso-install.sh   partitioning, pacstrap, bootloader, user, handoff
-bootstrap/install.sh       stages: preflight packages link theme services verify
-bin/                       ray + ~10 tiny helpers
+bootstrap/install.sh       stages: preflight packages link solarvim theme services verify
+bin/                       ray (update, menu, keys…) + ~10 tiny helpers
+                           solarvim is cloned to ~/.local/share/solarvim by the `solarvim` stage
 dots/                      hand-written configs; *.in are templates
 templates/                 outputs outside the repo (solarvim ray.lua)
 themes/                    palette + committed generated wallpaper PNG
@@ -112,6 +113,10 @@ first — that is a missing render step, not a bad config.
 - **VM graphics**: virtio-gpu + mesa; if the renderer fails, `WLR_RENDERER=pixman sway`.
 - **`sway` vs `sway exec`**: the former starts the compositor; the latter sends
   a command to an existing one and fails with "Unable to retrieve socket path".
+- **i3bar header**: `status` must print `{"version":1}` and `[` before the
+  first line, or swaybar renders the raw JSON as text.
+- **Cheat sheet source**: `30-binds.conf` comments are parsed by `bin/keys`.
+  Keep `## section` and one `# description` above each group of bindsyms.
 - **Tool detection**: `curl` and `git` are not in Arch's `base` package. A bare
   archinstall cannot fetch this installer.
 

@@ -1,64 +1,129 @@
 #!/usr/bin/env bash
-# ray — the CLI. Thin dispatcher; the work lives in one file per command.
+# ray — the one command you need to remember.
 set -euo pipefail
 
-ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+ROOT=$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)
+STATE=${XDG_STATE_HOME:-$HOME/.local/state}/rayconfig
+SV=${XDG_DATA_HOME:-$HOME/.local/share}/solarvim
+
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+	H=$'\033[1;38;5;214m' G=$'\033[38;5;149m' R=$'\033[38;5;203m' Z=$'\033[0m'
+else H='' G='' R='' Z=''; fi
+step() { printf '\n%s☀ %s%s\n' "$H" "$*" "$Z"; }
+note() { if command -v notify-send >/dev/null 2>&1; then notify-send -a ray "$@" || true; fi; }
 
 usage() {
-	cat <<'EOF'
-ray — Rayconfig
+	cat <<EOF
+${H}ray${Z} — Rayconfig
 
-  ray install [opts]   run the installer (same as ./install.sh)
-  ray update           git pull + re-link + re-render + verify
-  ray doctor           verify the install
-  ray theme [name]     sunset | sunny | toggle
-  ray status           print one bar line (debugging)
-  ray keys             key cheat sheet
-  ray edit [name]      open a config in $EDITOR
+  ray update           update everything: Arch packages, rayconfig, solarvim
+  ray menu [power]     system menu (Super+Alt+Space / Super+Escape)
+  ray keys [sway|vim]  cheat sheets (Super+/)
+  ray theme [name]     sunset | sunny | toggle (Super+T)
+  ray doctor           check the install, read-only
+  ray edit [what]      sway | foot | mako | fuzzel | swaylock | theme | vim | local
+  ray install [opts]   re-run the installer (idempotent)
+  ray status           print one bar line
 
-Configs live in dots/, palettes in themes/. Edit *.in, never the
-generated file beside it.
+Edit *.in templates and themes/*/palette, never the generated files.
 EOF
+}
+
+pull() { # dir name
+	[ -d "$1/.git" ] || { printf '  %s: not a git checkout, skipped\n' "$2"; return 0; }
+	local before after
+	before=$(git -C "$1" rev-parse --short HEAD)
+	if git -C "$1" pull --quiet --ff-only; then
+		after=$(git -C "$1" rev-parse --short HEAD)
+		if [ "$before" = "$after" ]; then
+			printf '  %s: up to date (%s)\n' "$2" "$after"
+		else
+			printf '  %s: %s → %s\n' "$2" "$before" "$after"
+			git -C "$1" log --oneline "$before..$after" | sed 's/^/    /'
+		fi
+	else
+		printf '  %s%s: local changes, not fast-forwarded — kept as-is%s\n' "$R" "$2" "$Z"
+	fi
+}
+
+update() {
+	step "Arch packages"
+	if [ "$(id -u)" -eq 0 ]; then pacman -Syu --noconfirm; else sudo pacman -Syu; fi
+	step "rayconfig"
+	pull "$ROOT" rayconfig
+	step "solarvim"
+	pull "$SV" solarvim
+	step "re-link and re-render"
+	"$ROOT/bootstrap/install.sh" --yes --skip packages,verify | grep -vE '^ ok ' || true
+	step "check"
+	if "$ROOT/bin/doctor" >/dev/null 2>&1; then
+		printf '  %sall good%s\n' "$G" "$Z"
+	else
+		printf '  %sproblems found — run: ray doctor%s\n' "$R" "$Z"
+	fi
+	: >"$STATE/updates" 2>/dev/null || true
+	if command -v swaymsg >/dev/null 2>&1 && swaymsg -t get_version >/dev/null 2>&1; then
+		swaymsg reload >/dev/null || true
+	fi
+	if [ ! -d "/usr/lib/modules/$(uname -r)" ]; then
+		printf '\n  %sthe kernel was updated — reboot when convenient%s\n' "$H" "$Z"
+	fi
+	note "System updated" "Everything is current."
+}
+
+pick() { fuzzel --dmenu --prompt "$1" --lines "${2:-6}" --width 30; }
+float() { exec foot --app-id ray-float -e sh -c "$1; printf '\nEnter to close '; read -r _"; }
+
+menu() {
+	local items cmd
+	if [ "${1:-}" = power ]; then
+		items='lock\nsuspend\nlog out\nreboot\npower off'
+	else
+		items='update system\nkeys cheat sheet\ntheme toggle\nedit config\ndoctor\nlock\nsuspend\nlog out\nreboot\npower off'
+	fi
+	cmd=$(printf "$items\n" | pick "☀ " 10) || exit 0
+	case $cmd in
+	'update system') float "'$ROOT/bin/ray' update" ;;
+	'keys cheat sheet') exec foot --app-id ray-float -e "$ROOT/bin/keys" --pager ;;
+	'theme toggle') exec "$ROOT/bin/theme" toggle ;;
+	'edit config') exec foot -e "$ROOT/bin/ray" edit ;;
+	doctor) float "'$ROOT/bin/doctor'" ;;
+	lock) exec swaylock -f ;;
+	suspend) exec systemctl suspend ;;
+	'log out') exec swaymsg exit ;;
+	reboot) exec systemctl reboot ;;
+	'power off') exec systemctl poweroff ;;
+	esac
 }
 
 sub=${1:-}
 [ $# -gt 0 ] && shift
-
 case $sub in
-install)
-	exec "$ROOT/bootstrap/install.sh" "$@"
-	;;
-update)
-	git -C "$ROOT" pull --ff-only
-	exec "$ROOT/bootstrap/install.sh" --yes "$@"
-	;;
-doctor)
-	exec "$ROOT/bin/doctor" "$@"
-	;;
-theme)
-	exec "$ROOT/bin/theme" "${@:-toggle}"
-	;;
-status)
-	exec "$ROOT/bin/status" "${@:---once}"
-	;;
-keys)
-	exec "$ROOT/bin/keys" "$@"
+install) exec "$ROOT/bootstrap/install.sh" "$@" ;;
+update | upgrade) update ;;
+menu) menu "$@" ;;
+doctor) exec "$ROOT/bin/doctor" "$@" ;;
+theme) exec "$ROOT/bin/theme" "${@:-toggle}" ;;
+status) exec "$ROOT/bin/status" "${@:---once}" ;;
+keys) exec "$ROOT/bin/keys" "$@" ;;
+hello) # first login only
+	[ -f "$STATE/welcomed" ] && exit 0
+	mkdir -p "$STATE" && : >"$STATE/welcomed"
+	note "Welcome to Rayconfig ☀" "Super+/  every key
+Super+Alt+Space  menu
+Super+Enter  terminal"
 	;;
 edit)
-	name=${1:-sway}
-	case $name in
-	sway | foot | mako | fuzzel)
-		exec "${EDITOR:-nvim}" "$ROOT/dots/$name"
-		;;
-	theme | palette)
-		exec "${EDITOR:-nvim}" "$ROOT/themes/$(cat "${XDG_STATE_HOME:-$HOME/.local/state}/rayconfig/theme" 2>/dev/null || echo sunset)/palette"
-		;;
-	*) exec "${EDITOR:-nvim}" "$ROOT" ;;
+	ed=${EDITOR:-nvim}
+	case ${1:-} in
+	sway | foot | mako | fuzzel | swaylock) exec "$ed" "$ROOT/dots/$1" ;;
+	theme | palette) exec "$ed" "$ROOT/themes/$(cat "$STATE/theme" 2>/dev/null || echo sunset)/palette" ;;
+	vim | solarvim) exec "$ed" "${XDG_CONFIG_HOME:-$HOME/.config}/solarvim/init.lua" ;;
+	local) exec "$ed" "${XDG_CONFIG_HOME:-$HOME/.config}/sway/config.d/90-local.conf" ;;
+	*) cd "$ROOT" && exec "$ed" . ;;
 	esac
 	;;
-'' | -h | --help | help)
-	usage
-	;;
+'' | -h | --help | help) usage ;;
 *)
 	printf 'ray: unknown command: %s\n\n' "$sub" >&2
 	usage >&2

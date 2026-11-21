@@ -1,46 +1,75 @@
 #!/bin/sh
-# keys — the cheat sheet, generated from the comments in the sway config.
-# Nothing to maintain: describe a bind with a '# comment' above it.
+# keys — cheat sheets, generated from the configs themselves. Nothing to keep
+# in sync: sway binds are read from 30-binds.conf (## section, # description),
+# solarvim's from its own key table.
+#
+#   keys            desktop + editor
+#   keys sway|vim   just one
+#   keys --pager    same, in less (what Super+/ opens)
 set -eu
 
-ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$(readlink -f "$0")")/.." && pwd)
 binds=$ROOT/dots/sway/config.d/30-binds.conf
 
-[ -f "$binds" ] || {
-	printf 'keys: no binds file at %s\n' "$binds" >&2
-	exit 1
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+	H=$(printf '\033[1;38;5;214m'); K=$(printf '\033[38;5;222m'); D=$(printf '\033[38;5;244m'); Z=$(printf '\033[0m')
+else H='' K='' D='' Z=''; fi
+
+sway_sheet() {
+	printf '%s☀ DESKTOP%s  %s(Super = the Windows key)%s\n' "$H" "$Z" "$D" "$Z"
+	awk -v H="$H" -v K="$K" -v Z="$Z" '
+		function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
+		function pretty(k) {
+			gsub(/\$mod/, "Super", k); gsub(/XF86Audio/, "", k); gsub(/XF86MonBrightness/, "Bright", k)
+			gsub(/Return/, "Enter", k); gsub(/slash/, "/", k); gsub(/minus/, "-", k); gsub(/comma/, ",", k)
+			gsub(/space/, "Space", k); gsub(/\+Prior$/, "+PgUp", k); gsub(/\+Next$/, "+PgDn", k)
+			return k
+		}
+		# Super+Shift+Left, Super+Shift+Right -> Super+Shift+Left/Right; 1..9 -> 1-9
+		function group(   i, pre, suf, out, p) {
+			if (n == 1) return ks[1]
+			p = ks[1]; sub(/[^+]+$/, "", p)
+			for (i = 2; i <= n; i++) { q = ks[i]; sub(/[^+]+$/, "", q); if (q != p) break }
+			if (i <= n) { out = ks[1]; for (i = 2; i <= n; i++) out = out "  " ks[i]; return out }
+			out = ""
+			for (i = 1; i <= n; i++) { suf = substr(ks[i], length(p) + 1); out = out (i > 1 ? "/" : "") suf }
+			if (n > 4) out = substr(ks[1], length(p) + 1) "-" substr(ks[n], length(p) + 1)
+			return p out
+		}
+		function flush() { if (n) printf "  %s%-30s%s %s\n", K, group(), Z, last; n = 0 }
+		/^## / { flush(); printf "\n%s%s%s\n", H, toupper(substr($0, 4)), Z; next }
+		/^# / { flush(); last = trim(substr($0, 3)); next }
+		/^bindsym/ {
+			line = $0; sub(/^bindsym[ \t]+(--[a-z-]+[ \t]+)*/, "", line)
+			ks[++n] = pretty(substr(line, 1, index(line " ", " ") - 1))
+		}
+		END { flush() }
+	' "$binds"
 }
 
-# Resolve $mod from defaults so the cheat sheet says Super, not $mod.
-mod=$(sed -n 's/^[[:space:]]*set[[:space:]]\+\$mod[[:space:]]\+//p' \
-	"$ROOT/dots/sway/config.d/10-defaults.conf" 2>/dev/null | head -n1)
-mod=${mod:-Mod4}
-mod=$(printf '%s' "$mod" | sed 's/^Mod4$/Super/')
+vim_sheet() {
+	printf '\n%s☀ EDITOR — solarvim%s  %s(Space = leader, :Keys inside nvim)%s\n\n' "$H" "$Z" "$D" "$Z"
+	if command -v nvim >/dev/null 2>&1; then
+		NVIM_APPNAME=solarvim nvim --headless '+lua if Solar then Solar.print_sheet() end' +qa 2>/dev/null |
+			sed "s/^\([A-Z][A-Z]*\)\$/$H\1$Z/"
+	else
+		printf '  neovim is not installed\n'
+	fi
+}
 
-awk -v mod="$mod" '
-	function trim(s) { sub(/^[[:space:]]+/, "", s); sub(/[[:space:]]+$/, "", s); return s }
-	{
-		line = $0
-		if (buf != "") line = buf " " line
-		if (line ~ /\\[[:space:]]*$/) {
-			sub(/\\[[:space:]]*$/, "", line)
-			buf = line
-			next
-		}
-		buf = ""
-		if (line ~ /^[[:space:]]*#/) {
-			desc = trim(substr(line, index(line, "#") + 1))
-			next
-		}
-		if (line ~ /^[[:space:]]*bindsym/) {
-			sub(/^[[:space:]]*bindsym[[:space:]]+/, "", line)
-			line = trim(line)
-			i = index(line, " ")
-			key = i ? substr(line, 1, i - 1) : line
-			cmd = i ? trim(substr(line, i + 1)) : ""
-			gsub(/\$mod/, mod, key)
-			printf "  %-22s %s\n", key, (desc != "" ? desc : cmd)
-			desc = ""
-		}
-	}
-' "$binds"
+all() {
+	case ${1:-all} in
+	sway) sway_sheet ;;
+	vim) vim_sheet ;;
+	*) sway_sheet; vim_sheet ;;
+	esac
+}
+
+case ${1:-} in
+--pager)
+	shift
+	all "${1:-all}" | less -R
+	;;
+-h | --help) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//' ;;
+*) all "${1:-all}" ;;
+esac

@@ -19,7 +19,7 @@ themes/<name>/palette  ──►  bin/gen-theme  ──►  every config that ha
 Boot the Arch ISO, connect to the network (`iwctl` for wifi), then:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/apv022/Rayconfig/refs/tags/v0.2.4/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/apv022/Rayconfig/refs/tags/v0.3.0/install.sh | sh
 ```
 
 It detects archiso and runs `bootstrap/iso-install.sh`, which:
@@ -27,10 +27,11 @@ It detects archiso and runs `bootstrap/iso-install.sh`, which:
 1. lists candidate disks (excluding the ISO medium) and asks which one to erase,
 2. asks for a username and password, and for you to type the disk name back,
 3. GPT-partitions the disk (1 GiB ESP + ext4 root on UEFI; bios_grub + ext4 on BIOS),
-4. `pacstrap`s Arch with a kernel, NetworkManager, sudo, git and curl,
+4. refreshes the keyring and `pacstrap`s Arch with a kernel, NetworkManager, sudo, git and curl,
 5. writes bootloader, locale, timezone, users and sudoers,
 6. installs Rayconfig into the new user's home and runs the config stage,
-7. unmounts and tells you to reboot and `exec sway`.
+7. installs solarvim, makes `nvim` mean solarvim, and starts sway on tty1 login,
+8. unmounts and tells you to reboot.
 
 Non-interactive form (still prompts for the password, from `/dev/tty`):
 
@@ -48,7 +49,7 @@ The same URL, no flags: it detects that you are not on the ISO and only
 installs the desktop (packages, configs, theme, verify).
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/apv022/Rayconfig/refs/tags/v0.2.4/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/apv022/Rayconfig/refs/tags/v0.3.0/install.sh | sh
 ./install.sh --dry-run
 ./install.sh --check
 ```
@@ -87,34 +88,25 @@ git tag -a vX.Y.Z -m "…" && git push origin vX.Y.Z   # then bump this README
 you maintain forever. Writing your own means owning a VT parser. `foot` is the
 st of Wayland. Alacritty is available with `--extras` if you want to A/B it.
 
-## Keys — Mod behaves like Windows
+## Everyday use
 
-`$mod` is Super. `$mod+Shift+slash` prints the live list, generated from the
-comments in `dots/sway/config.d/30-binds.conf`.
-
-| key | action |
+| | |
 |---|---|
-| `Super+Return` | terminal |
-| `Super+D` | launcher |
-| `Super+E` | file manager (home dir) |
-| `Super+Tab` | window switcher |
-| `Super+L` | lock |
-| `Super+Left` / `Right` | snap window to half the screen |
-| `Super+Up` / `Down` | maximise / restore |
-| `Super+Shift+arrows` | move window in the tiling tree |
-| `Super+Ctrl+arrows` | resize |
-| `Super+1..9` | workspace |
-| `Super+Shift+1..9` | move window to workspace |
-| `Super+Q` | close |
-| `Super+Space` | float toggle |
-| `Super+F` | fullscreen |
-| `Super+T` | toggle sunny/sunset |
-| `Super+Shift+S` / `Print` | screenshot region / full |
-| `Super+Shift+R` / `+E` | reload / exit |
+| `Super+/` | **cheat sheet** — every desktop and editor shortcut, generated from the configs |
+| `Super+Alt+Space` | menu: update, theme, keys, doctor, lock, suspend, reboot, power off |
+| `Super+Escape` | power menu |
+| `ray update` | updates Arch, rayconfig and solarvim, re-renders, checks, tells you if a reboot is due |
+| bar | shows `↑ N updates` when Arch has updates (checked every 30 min) |
 
-Sway is a tiler, so Win+Left/Right snap by floating the window into a half. For
-vim-style `h/j/k/l` focus, add your own binds to
-`~/.config/sway/config.d/90-local.conf` (gitignored, matched by the include glob).
+Mod is Super and behaves like Windows: `Super+Left/Right` snap, `Up/Down`
+maximise/restore, `Tab` switch window, `E` files, `L` lock, `Enter` terminal,
+`D` launcher, `N` editor, `T` sunny/sunset. Run `ray keys` for the full list.
+For vim-style `h/j/k/l` focus, add binds to `~/.config/sway/config.d/90-local.conf`
+(gitignored); `ray edit local` opens it.
+
+The cheat sheet has no second copy to maintain: sway's comes from the
+`## section` / `# description` comments in `dots/sway/config.d/30-binds.conf`,
+solarvim's from the table that creates its mappings.
 
 ## Layout
 
@@ -137,18 +129,19 @@ the dev tool and committed; any monitor size is fine (`-m fill`).
 
 ## After install
 
-Log into a TTY and run `exec sway`. Then:
+Log in on tty1; sway starts by itself (opt out: `touch ~/.config/rayconfig-no-autostart`).
+On an existing Arch box, log in on a TTY and type `sway`.
 
 ```sh
-ray doctor        # the same verification the installer runs
-ray theme sunny   # or sunset, or toggle — also swaps the wallpaper
-ray update        # git pull + re-link + re-render
-ray keys          # cheat sheet
+ray doctor        # health check, read-only
+ray update        # everything up to date
+ray theme sunny   # or sunset, or toggle — also swaps wallpaper, lock screen, editor
+ray keys          # cheat sheets (sway | vim)
+ray edit          # open the repo in solarvim
 ```
 
-## Roadmap (deliberately not in v0.1)
+## Roadmap
 
-- `state/` — one daemon owning volume/battery/workspaces on a socket.
 - OSD for volume/brightness via mako.
 - Rounded corners / blur are not possible without swayfx (a sway fork, AUR).
   Deliberately left out.

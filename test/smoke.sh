@@ -78,7 +78,7 @@ case $out in
 esac
 
 keyout=$("$ROOT/bin/keys" 2>/dev/null || true)
-if printf '%s' "$keyout" | grep -q 'Super+Return'; then
+if printf '%s' "$keyout" | grep -q 'Super+Enter'; then
 	pass "keys parses the binds file"
 else
 	fail "keys produced nothing usable"

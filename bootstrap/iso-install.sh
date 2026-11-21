@@ -233,7 +233,7 @@ run mkdir -p /mnt/boot
 
 # ------------------------------------------------------------------ pacstrap
 
-PKGS=(base linux linux-firmware networkmanager sudo git curl nano less)
+PKGS=(base linux linux-firmware networkmanager sudo git curl less man-db bash-completion)
 case $(grep -m1 '^vendor_id' /proc/cpuinfo | awk '{print $3}') in
 *Intel*) PKGS+=(intel-ucode) ;;
 *AMD*) PKGS+=(amd-ucode) ;;
@@ -243,6 +243,11 @@ if [ "$UEFI" = 1 ]; then
 else
 	PKGS+=(grub)
 fi
+
+# Old ISOs ship stale keys; refreshing the keyring first avoids
+# "signature is unknown trust" halfway through pacstrap.
+say "refreshing the Arch keyring"
+run pacman -Sy --noconfirm --needed archlinux-keyring
 
 say "pacstrap (this is the slow part)"
 run pacstrap -K /mnt "${PKGS[@]}"
@@ -275,7 +280,16 @@ id -u '$NEWUSER' >/dev/null 2>&1 || useradd -m -G wheel,video -s /bin/bash '$NEW
 printf '%%wheel ALL=(ALL:ALL) ALL\n' > /etc/sudoers.d/10-wheel
 chmod 440 /etc/sudoers.d/10-wheel
 
-printf 'export PATH="\$HOME/.local/bin:\$PATH"\n' > /etc/profile.d/10-rayconfig.sh
+cat > /etc/profile.d/10-rayconfig.sh <<'PROFILE'
+# Rayconfig: user scripts on PATH, solarvim as the editor.
+case ":\$PATH:" in *":\$HOME/.local/bin:"*) ;; *) export PATH="\$HOME/.local/bin:\$PATH" ;; esac
+export EDITOR=nvim VISUAL=nvim
+export NVIM_APPNAME=\${NVIM_APPNAME:-solarvim}
+# Start sway when logging in on tty1. Opt out: touch ~/.config/rayconfig-no-autostart
+if [ "\$(tty)" = /dev/tty1 ] && [ -z "\${WAYLAND_DISPLAY:-}" ] && [ ! -e "\$HOME/.config/rayconfig-no-autostart" ] && command -v sway >/dev/null; then
+	exec sway
+fi
+PROFILE
 
 systemctl enable NetworkManager.service systemd-timesyncd.service >/dev/null 2>&1 || true
 mkinitcpio -P >/dev/null 2>&1 || true
@@ -336,7 +350,7 @@ say "installing rayconfig into the new system"
 TARGET=/mnt/home/$NEWUSER/.local/share/rayconfig
 if [ "$DRY" = 1 ]; then
 	printf '  %s+%s copy %s -> %s\n' "$D" "$Z" "$REPO_SRC" "$TARGET"
-	printf '  %s+%s arch-chroot /mnt env HOME=/home/%s RAYCONFIG_ALLOW_ROOT=1 ./bootstrap/install.sh --yes\n' \
+	printf '  %s+%s arch-chroot /mnt env HOME=/home/%s RAYCONFIG_ALLOW_ROOT=1 ./bootstrap/install.sh --yes --skip verify\n' \
 		"$D" "$Z" "$NEWUSER"
 else
 	mkdir -p "$TARGET"
@@ -348,9 +362,11 @@ else
 	ok "repo owned by $NEWUSER"
 	# No sudo and no tty here: run the config stage as root with HOME pointed
 	# at the new user, so pacman is called directly and configs land in the
-	# right home. Then hand the whole home back to the user.
+	# right home. Then hand the whole home back to the user. verify is skipped:
+	# sway --validate inside a chroot has no seat or runtime dir; `ray doctor`
+	# runs for real after the first login.
 	arch-chroot /mnt env HOME="/home/$NEWUSER" RAYCONFIG_ALLOW_ROOT=1 \
-		/bin/bash -c 'cd "$HOME/.local/share/rayconfig" && ./bootstrap/install.sh --yes' ||
+		/bin/bash -c 'cd "$HOME/.local/share/rayconfig" && ./bootstrap/install.sh --yes --skip verify' ||
 		die "rayconfig stage failed; see the error above"
 	arch-chroot /mnt chown -R "$NEWUSER:$NEWUSER" "/home/$NEWUSER"
 	ok "rayconfig"
@@ -363,17 +379,15 @@ umount -R /mnt 2>/dev/null || true
 printf '\n'
 say "done — Arch + Rayconfig on $DISK"
 cat <<EOF
-  reboot, then log in as $NEWUSER on tty1 and run:
+  reboot (take the USB stick out), log in as $NEWUSER on tty1 —
+  sway starts by itself. Then:
 
-      exec sway
+      Super+/            every shortcut, desktop and editor
+      Super+Alt+Space    menu: update, theme, lock, power
+      Super+Enter        terminal        Super+D   launcher
+      ray update         update everything      ray doctor   health check
 
-  first things inside sway:
-
-      Super+D        launcher
-      Super+Left     snap window to the left half (Windows-style)
-      Super+Up       maximise
-      Super+Enter    terminal
-      Super+T        toggle sunny / sunset
+  VM with a black screen? log in, then:  WLR_RENDERER=pixman sway
 
   root and $NEWUSER both use the password you typed.
   theme: ~/.local/share/rayconfig/themes/

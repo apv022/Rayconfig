@@ -19,7 +19,7 @@ out=
 add() { # name text fg [bg]
 	out="$out${out:+,}{\"name\":\"$1\",\"full_text\":\"$2\",\"color\":\"$3\""
 	[ -n "${4:-}" ] && out="$out,\"background\":\"$4\""
-	out="$out}"
+	out="$out,\"separator\":false,\"separator_block_width\":14}"
 }
 
 seg_net() {
@@ -72,8 +72,23 @@ seg_bat() {
 	done
 }
 
+# Pending Arch updates, refreshed in the background at most every 30 min.
+# checkupdates (pacman-contrib) uses a private db copy, so it never locks pacman.
+seg_updates() {
+	command -v checkupdates >/dev/null 2>&1 || return 0
+	f=$STATE/updates
+	if [ ! -f "$f" ] || [ -n "$(find "$f" -mmin +30 2>/dev/null)" ]; then
+		mkdir -p "$STATE" && touch "$f"
+		(checkupdates 2>/dev/null | wc -l >"$f.new" && mv "$f.new" "$f") >/dev/null 2>&1 &
+	fi
+	n=$(cat "$f" 2>/dev/null || echo 0)
+	[ "${n:-0}" -gt 0 ] 2>/dev/null && add updates " ↑ $n updates · ray update " "$RAY_ACCENT"
+	return 0
+}
+
 emit() {
 	out=
+	[ "${1:-}" = once ] || seg_updates
 	seg_net
 	seg_vol
 	seg_bat
@@ -83,7 +98,7 @@ emit() {
 
 case ${1:-} in
 --once)
-	emit
+	emit once
 	exit 0
 	;;
 -h | --help)
@@ -92,8 +107,12 @@ case ${1:-} in
 	;;
 esac
 
+# i3bar protocol: a header, then an endless JSON array of status lines.
+# Without the header swaybar falls back to plain text and shows raw JSON.
 trap 'exit 0' INT TERM
+printf '{"version":1}\n[\n'
 while :; do
 	emit
+	printf ','
 	sleep 2
 done

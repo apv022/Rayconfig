@@ -13,7 +13,7 @@ BACKUP_ROOT=$HOME/.config-backup
 THEME=${RAYCONFIG_THEME:-sunset}
 SUDO=(sudo)
 
-ALL_STAGES=(preflight packages link theme services verify)
+ALL_STAGES=(preflight packages link solarvim theme services verify)
 ONLY=()
 SKIP=()
 DRY=0
@@ -34,7 +34,7 @@ usage: install.sh [options]
   --services     enable system units (bluetooth)
   --theme NAME   sunset (default) or sunny
 
-stages: preflight packages link theme services verify
+stages: preflight packages link solarvim theme services verify
 EOF
 }
 
@@ -196,6 +196,7 @@ stage_link() {
 	linkdir "$ROOT/dots/foot" "$CFG/foot"
 	linkdir "$ROOT/dots/mako" "$CFG/mako"
 	linkdir "$ROOT/dots/fuzzel" "$CFG/fuzzel"
+	linkdir "$ROOT/dots/swaylock" "$CFG/swaylock"
 
 	local f
 	for f in "$ROOT"/bin/*; do
@@ -208,6 +209,25 @@ stage_link() {
 	*":$LOCAL_BIN:"*) ok "PATH contains $LOCAL_BIN" ;;
 	*) warn "$LOCAL_BIN is not on PATH; add it to your shell rc" ;;
 	esac
+}
+
+# solarvim is its own repo; clone it next to rayconfig and let its own
+# idempotent installer link ~/.config/solarvim. gen-theme then drops the
+# palette-driven colors/ray.lua into it.
+SV_REPO=${SOLARVIM_REPO:-https://github.com/apv022/SolarVim.git}
+SV_DIR=${XDG_DATA_HOME:-$HOME/.local/share}/solarvim
+stage_solarvim() {
+	say "solarvim"
+	if [ -d "$SV_DIR/.git" ]; then
+		run git -C "$SV_DIR" pull --quiet --ff-only || warn "solarvim has local changes; left as-is"
+	elif [ -e "$SV_DIR" ]; then
+		warn "$SV_DIR exists and is not a git checkout; skipped"
+		return 0
+	else
+		run git clone --quiet --depth 1 "$SV_REPO" "$SV_DIR" || { warn "could not clone solarvim; skipped"; return 0; }
+	fi
+	run "$SV_DIR/install.sh" >/dev/null
+	ok "solarvim -> $CFG/solarvim"
 }
 
 stage_theme() {
@@ -248,12 +268,12 @@ stage_done() {
 	printf '\n'
 	say "rayconfig installed"
 	cat <<EOF
-  log into a TTY (Ctrl+Alt+F3) and run:  exec sway
-  from inside sway:                      ray theme sunny
-                                         ray keys
-                                         ray update
+  log in on tty1 and run:   sway
+  then:                     Super+/          every key
+                            Super+Alt+Space  menu (update, theme, power)
+                            ray update       update the whole system
 
-  configs:  $CFG/{sway,foot,mako,fuzzel}
+  configs:  $CFG/{sway,foot,mako,fuzzel,swaylock,solarvim}
   scripts:  $LOCAL_BIN/{ray,status,theme,gen-theme,doctor,keys,vol,bright,shot,snap,winlist}
   theme:    themes/$THEME/palette  (edit, then: ray theme $THEME)
   backups:  $BACKUP_ROOT

@@ -23,3 +23,11 @@ git
 xdg-utils
 ttf-jetbrains-mono
 noto-fonts
+# editor + the tools solarvim's finder/grep use
+neovim
+ripgrep
+# `ray update` / bar update count, notify-send for `ray` messages, pager for keys
+pacman-contrib
+libnotify
+less
+man-db

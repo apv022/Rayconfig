@@ -9,7 +9,6 @@ swayidle
 swaybg
 foot
 fuzzel
-swaybg
 mako
 grim
 slurp
@@ -19,3 +18,8 @@ wpctl
 sed
 awk
 date
+nvim
+rg
+checkupdates
+notify-send
+less
