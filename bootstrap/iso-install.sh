@@ -12,6 +12,8 @@
 #   --user NAME         login user (asked if omitted)
 #   --hostname NAME     defaults to rayarch
 #   --timezone TZ       defaults to UTC (e.g. Europe/Berlin)
+#   --no-encrypt        skip full-disk encryption (on by default: LUKS2,
+#                       unlocked at boot with your password on the splash)
 #   --yes               no prompts (requires --disk and --user)
 #   --fast-mirrors      run reflector before installing
 #   --dry-run           print every action, touch nothing
@@ -24,6 +26,7 @@ NEWTZ="UTC"
 YES=0
 DRY=0
 FAST=0
+ENCRYPT=1
 REPO_SRC=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 
 usage() {
@@ -40,6 +43,7 @@ while [ $# -gt 0 ]; do
 	--yes | -y) YES=1; shift ;;
 	--dry-run) DRY=1; shift ;;
 	--fast-mirrors) FAST=1; shift ;;
+	--no-encrypt) ENCRYPT=0; shift ;;
 	-h | --help) usage ;;
 	*) printf 'iso-install: unknown argument: %s\n' "$1" >&2; exit 2 ;;
 	esac
@@ -110,7 +114,7 @@ fi
 say "archiso install: Arch + Rayconfig"
 [ "$DRY" = 1 ] && warn "dry run: no disks will be touched"
 
-for c in pacstrap sgdisk arch-chroot lsblk mkfs.ext4; do
+for c in pacstrap sgdisk arch-chroot lsblk mkfs.ext4 cryptsetup; do
 	command -v "$c" >/dev/null 2>&1 || die "missing tool on the ISO: $c"
 done
 
@@ -123,6 +127,9 @@ ok "network"
 
 if findmnt -rn /mnt >/dev/null 2>&1; then
 	die "/mnt is in use. Run: umount -R /mnt"
+fi
+if [ -e /dev/mapper/root ]; then
+	die "an encrypted 'root' is still open from an earlier attempt. Run: cryptsetup close root"
 fi
 
 if [ "$FAST" = 1 ] && command -v reflector >/dev/null 2>&1 && [ "$DRY" = 0 ]; then
@@ -196,6 +203,7 @@ info=$(lsblk -dpno SIZE,MODEL "$DISK" | head -n1)
 printf '\n%s  THIS WILL ERASE %s%s\n' "$R" "$DISK" "$Z" >&2
 printf '  %s\n' "$info" >&2
 printf '  boot mode: %s\n' "$([ "$UEFI" = 1 ] && echo UEFI || echo BIOS)" >&2
+printf '  encryption: %s\n' "$([ "$ENCRYPT" = 1 ] && echo 'on — the same password unlocks the disk at boot' || echo off)" >&2
 printf '  user: %s   host: %s   timezone: %s\n\n' "$NEWUSER" "$NEWHOST" "$NEWTZ" >&2
 
 if [ "$YES" = 0 ]; then
@@ -208,32 +216,58 @@ fi
 say "partitioning $DISK"
 run wipefs -af "$DISK"
 run sgdisk --zap-all "$DISK"
+# UEFI: 1 ESP (/boot, 1G) + 2 root.
+# BIOS: 1 bios_grub + 2 /boot (1G ext4, unencrypted so GRUB can read it) + 3 root.
 if [ "$UEFI" = 1 ]; then
 	run sgdisk -n "1:0:+1G" -t 1:ef00 -c 1:ESP "$DISK"
+	run sgdisk -n "2:0:0" -t 2:8300 -c 2:root "$DISK"
 else
 	run sgdisk -n "1:0:+1M" -t 1:ef02 -c 1:BIOS "$DISK"
+	run sgdisk -n "2:0:+1G" -t 2:8300 -c 2:boot "$DISK"
+	run sgdisk -n "3:0:0" -t 3:8300 -c 3:root "$DISK"
 fi
-run sgdisk -n "2:0:0" -t 2:8300 -c 2:root "$DISK"
 run partprobe "$DISK" || true
 [ "$DRY" = 1 ] || udevadm settle
 
 P1=$(part "$DISK" 1)
-P2=$(part "$DISK" 2)
+if [ "$UEFI" = 1 ]; then
+	BOOTP=$P1
+	ROOTP=$(part "$DISK" 2)
+else
+	BOOTP=$(part "$DISK" 2)
+	ROOTP=$(part "$DISK" 3)
+fi
 
 say "filesystems"
 if [ "$UEFI" = 1 ]; then
-	run mkfs.fat -F32 -n ESP "$P1"
+	run mkfs.fat -F32 -n ESP "$BOOTP"
+else
+	run mkfs.ext4 -F -L boot "$BOOTP"
 fi
-run mkfs.ext4 -F -L root "$P2"
+ROOTFS=$ROOTP
+if [ "$ENCRYPT" = 1 ]; then
+	say "encrypting $ROOTP (LUKS2)"
+	# The password goes in on stdin with no trailing newline, exactly as it
+	# will be typed at boot. It never touches a file.
+	if [ "$DRY" = 1 ]; then
+		printf '  %s+%s cryptsetup luksFormat --type luks2 %s  (password on stdin)\n' "$D" "$Z" "$ROOTP"
+		printf '  %s+%s cryptsetup open %s root\n' "$D" "$Z" "$ROOTP"
+	else
+		printf '%s' "$USERPASS" | cryptsetup luksFormat --type luks2 --batch-mode --key-file=- "$ROOTP"
+		printf '%s' "$USERPASS" | cryptsetup open --key-file=- "$ROOTP" root
+	fi
+	ROOTFS=/dev/mapper/root
+fi
+run mkfs.ext4 -F -L root "$ROOTFS"
 
 say "mounting"
-run mount "$P2" /mnt
+run mount "$ROOTFS" /mnt
 run mkdir -p /mnt/boot
-[ "$UEFI" = 1 ] && run mount "$P1" /mnt/boot
+run mount "$BOOTP" /mnt/boot
 
 # ------------------------------------------------------------------ pacstrap
 
-PKGS=(base linux linux-firmware networkmanager sudo git curl less man-db bash-completion)
+PKGS=(base linux linux-firmware networkmanager sudo git curl less man-db bash-completion cryptsetup plymouth)
 case $(grep -m1 '^vendor_id' /proc/cpuinfo | awk '{print $3}') in
 *Intel*) PKGS+=(intel-ucode) ;;
 *AMD*) PKGS+=(amd-ucode) ;;
@@ -274,7 +308,16 @@ else
 	genfstab -U /mnt >>/mnt/etc/fstab
 fi
 
-ROOT_UUID=$(blkid -s UUID -o value "$P2" 2>/dev/null || echo DRYRUN-UUID)
+ROOT_UUID=$(blkid -s UUID -o value "$ROOTFS" 2>/dev/null || echo DRYRUN-UUID)
+LUKS_UUID=$(blkid -s UUID -o value "$ROOTP" 2>/dev/null || echo DRYRUN-LUKS-UUID)
+# what the kernel needs to find (and unlock) the root filesystem
+if [ "$ENCRYPT" = 1 ]; then
+	KERNEL_ROOT="rd.luks.name=$LUKS_UUID=root root=/dev/mapper/root"
+	ENCRYPT_HOOK=sd-encrypt
+else
+	KERNEL_ROOT="root=UUID=$ROOT_UUID"
+	ENCRYPT_HOOK=
+fi
 
 # ------------------------------------------------------------------- chroot
 
@@ -309,7 +352,12 @@ fi
 PROFILE
 
 systemctl enable NetworkManager.service systemd-timesyncd.service >/dev/null 2>&1 || true
-mkinitcpio -P >/dev/null 2>&1 || true
+
+# systemd initramfs: plymouth draws the splash and asks for the disk
+# password; sd-encrypt unlocks it. keyboard + sd-vconsole come before so the
+# password can be typed with the right layout.
+sed -i 's/^HOOKS=.*/HOOKS=(base systemd plymouth autodetect modconf kms keyboard sd-vconsole block $ENCRYPT_HOOK filesystems fsck)/' /etc/mkinitcpio.conf
+mkinitcpio -P
 EOF
 )
 
@@ -339,7 +387,7 @@ printf 'default arch.conf\ntimeout 3\neditor no\n' > /boot/loader/loader.conf
   [ -f /boot/intel-ucode.img ] && echo 'initrd  /intel-ucode.img'
   [ -f /boot/amd-ucode.img ] && echo 'initrd  /amd-ucode.img'
   echo 'initrd  /initramfs-linux.img'
-  echo 'options root=UUID=$ROOT_UUID rw quiet'
+  echo 'options $KERNEL_ROOT rw quiet splash loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0'
 } > /boot/loader/entries/arch.conf
 EOF
 	)
@@ -347,6 +395,8 @@ else
 	boot_script=$(
 		cat <<EOF
 set -e
+sed -i 's|^GRUB_CMDLINE_LINUX_DEFAULT=.*|GRUB_CMDLINE_LINUX_DEFAULT="loglevel=3 quiet splash rd.udev.log_level=3 vt.global_cursor_default=0"|' /etc/default/grub
+sed -i 's|^GRUB_CMDLINE_LINUX=.*|GRUB_CMDLINE_LINUX="$KERNEL_ROOT"|' /etc/default/grub
 grub-install --target=i386-pc '$DISK' >/dev/null
 grub-mkconfig -o /boot/grub/grub.cfg >/dev/null
 EOF
@@ -391,7 +441,10 @@ fi
 
 # ---------------------------------------------------------------------- done
 
-umount -R /mnt 2>/dev/null || true
+if [ "$DRY" = 0 ]; then
+	umount -R /mnt 2>/dev/null || true
+	[ "$ENCRYPT" = 1 ] && cryptsetup close root 2>/dev/null || true
+fi
 
 printf '\n'
 say "done — Arch + Rayconfig on $DISK"
@@ -406,6 +459,6 @@ cat <<EOF
 
   VM with a black screen? log in, then:  WLR_RENDERER=pixman sway
 
-  root and $NEWUSER both use the password you typed.
+  root and $NEWUSER both use the password you typed.$([ "$ENCRYPT" = 1 ] && printf '\n  The disk is encrypted: type that same password on the boot splash.\n  Lose it and the data is gone — there is no recovery key.')
   theme: ~/.local/share/rayconfig/themes/
 EOF

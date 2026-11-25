@@ -62,6 +62,12 @@ for tdir in "$ROOT"/themes/*/; do
 	else
 		fail "$theme: sway colors missing"
 	fi
+	if [ -s "$tmp/state/rayconfig/plymouth/rayconfig.script" ] &&
+		grep -q 'SetBackgroundTopColor([0-9.]*, [0-9.]*, [0-9.]*)' "$tmp/state/rayconfig/plymouth/rayconfig.script"; then
+		pass "$theme: boot splash rendered"
+	else
+		fail "$theme: boot splash missing or colours not floats"
+	fi
 	if [ -s "$tmp/state/rayconfig/theme.sh" ]; then
 		pass "$theme: theme.sh written"
 	else

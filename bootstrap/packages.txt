@@ -26,6 +26,8 @@ noto-fonts
 # editor + the tools solarvim's finder/grep use
 neovim
 ripgrep
+# boot splash (themed from the palette by `ray splash`)
+plymouth
 # muhfm (the file manager) is built from source: Go is the only toolchain.
 # udisks2 mounts USB drives from it without root.
 go

@@ -160,6 +160,15 @@ else
 	meh "solarvim not installed — run: install.sh --only solarvim,theme"
 fi
 
+head_ "boot splash"
+if command -v plymouth-set-default-theme >/dev/null 2>&1; then
+	if [ "$(plymouth-set-default-theme 2>/dev/null)" = rayconfig ]; then good "plymouth theme: rayconfig"; else meh "plymouth theme is not rayconfig — run: ray splash"; fi
+	if grep -qE '^HOOKS=.*[( ]plymouth[ )]' /etc/mkinitcpio.conf 2>/dev/null; then good "plymouth in the initramfs"; else meh "no plymouth hook — run: ray splash"; fi
+	if grep -qw splash /proc/cmdline 2>/dev/null; then good "kernel booted with splash"; else meh "kernel was not booted with 'splash' — run: ray splash, then reboot"; fi
+else
+	meh "plymouth not installed — run: install.sh --only packages,splash"
+fi
+
 head_ "files (muhfm)"
 if command -v muhfm >/dev/null 2>&1; then
 	good "muhfm $(muhfm --version 2>/dev/null | awk '{print $2}')"

@@ -14,7 +14,7 @@ BACKUP_ROOT=$HOME/.config-backup
 THEME=${RAYCONFIG_THEME:-$(cat "$STATE/theme" 2>/dev/null || echo sunset)}
 SUDO=(sudo)
 
-ALL_STAGES=(preflight packages link solarvim muhfm theme services verify)
+ALL_STAGES=(preflight packages link solarvim muhfm theme splash services verify)
 ONLY=()
 SKIP=()
 DRY=0
@@ -35,7 +35,7 @@ usage: install.sh [options]
   --services     enable system units (bluetooth)
   --theme NAME   sunset (default), sunny, dusk, moss
 
-stages: preflight packages link solarvim muhfm theme services verify
+stages: preflight packages link solarvim muhfm theme splash services verify
 EOF
 }
 
@@ -314,6 +314,19 @@ stage_theme() {
 		fi
 	fi
 	ok "rendered from themes/$THEME/palette"
+}
+
+# Boot splash: plymouth themed from the palette. Touches /etc/mkinitcpio.conf
+# and the boot entries (only to add plymouth / splash), so it is a full-install
+# stage and `ray splash`, never part of `ray update`.
+stage_splash() {
+	say "boot splash"
+	if [ "$DRY" = 1 ]; then
+		printf '  + %s/bin/ray splash\n' "$ROOT"
+		return 0
+	fi
+	command -v plymouth-set-default-theme >/dev/null 2>&1 || { warn "plymouth not installed; skipped (install.sh --only packages,splash)"; return 0; }
+	"$ROOT/bin/ray" splash || warn "boot splash failed; run: ray splash"
 }
 
 stage_services() {

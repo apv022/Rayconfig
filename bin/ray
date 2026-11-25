@@ -34,6 +34,7 @@ ${H}ray${Z} — Rayconfig
   ray update           update everything: Arch, rayconfig, solarvim, muhfm
   ray theme [name]     any theme in themes/, toggle, next, prev, list
   ray font             pick the font for every app
+  ray splash           boot splash in the current theme (sudo, rebuilds initramfs)
   ray wallpaper [next] pick or cycle the wallpaper
   ray toggle <what>    nightlight idle dnd bar gaps opacity
   ray clipboard        clipboard history (Super+Ctrl+V)
@@ -491,6 +492,65 @@ remove_pkg() {
 	float_sh "sudo pacman -Rns '$p'"
 }
 
+# ---------------------------------------------------------------- boot splash
+
+asroot() { if [ "$(id -u)" -eq 0 ]; then "$@"; else sudo "$@"; fi; }
+
+# Install the palette's plymouth theme, make sure the initramfs runs plymouth
+# and the kernel is told `splash`, then rebuild the initramfs — each step only
+# if it is not already so. Safe to run any number of times.
+splash() {
+	local src=$STATE/plymouth dst=/usr/share/plymouth/themes/rayconfig
+	local conf=/etc/mkinitcpio.conf changed=0 f
+	have plymouth-set-default-theme || { echo "splash: plymouth is not installed (sudo pacman -S plymouth)" >&2; return 1; }
+	[ -f "$src/rayconfig.script" ] || "$ROOT/bin/gen-theme" >/dev/null
+	for f in rayconfig.plymouth rayconfig.script; do
+		if ! cmp -s "$src/$f" "$dst/$f"; then
+			asroot install -Dm644 "$src/$f" "$dst/$f"
+			changed=1
+		fi
+	done
+	if [ "$(plymouth-set-default-theme 2>/dev/null)" != rayconfig ]; then
+		asroot plymouth-set-default-theme rayconfig
+		changed=1
+	fi
+	echo "  theme: rayconfig ($(cat "$STATE/theme" 2>/dev/null || echo sunset))"
+
+	# initramfs hook: plymouth goes right after udev/systemd (before sd-encrypt,
+	# so it can ask for the disk password)
+	if [ -f "$conf" ] && ! grep -qE '^HOOKS=.*[( ]plymouth[ )]' "$conf"; then
+		[ -f "$conf.rayconfig-bak" ] || asroot cp "$conf" "$conf.rayconfig-bak"
+		if grep -qE '^HOOKS=.*[( ]systemd[ )]' "$conf"; then
+			asroot sed -i -E '/^HOOKS=/ s/([( ])systemd([ )])/\1systemd plymouth\2/' "$conf"
+		elif grep -qE '^HOOKS=.*[( ]udev[ )]' "$conf"; then
+			asroot sed -i -E '/^HOOKS=/ s/([( ])udev([ )])/\1udev plymouth\2/' "$conf"
+		else
+			echo "  add plymouth to HOOKS in $conf by hand (after udev or systemd)" >&2
+		fi
+		changed=1
+		echo "  $conf: plymouth hook added (backup: $conf.rayconfig-bak)"
+	fi
+
+	# kernel command line: `quiet splash` on systemd-boot entries or GRUB
+	for f in /boot/loader/entries/*.conf; do
+		[ -f "$f" ] || continue
+		grep -q '^options' "$f" || continue
+		grep -qE '^options.*\bsplash\b' "$f" || { asroot sed -i '/^options/ s/$/ splash/' "$f"; echo "  $f: + splash"; }
+		grep -qE '^options.*\bquiet\b' "$f" || asroot sed -i '/^options/ s/$/ quiet/' "$f"
+	done
+	if [ -f /etc/default/grub ] && ! grep -qE '^GRUB_CMDLINE_LINUX_DEFAULT=.*\bsplash\b' /etc/default/grub; then
+		asroot sed -i -E 's/^(GRUB_CMDLINE_LINUX_DEFAULT=")/\1splash /' /etc/default/grub
+		have grub-mkconfig && asroot grub-mkconfig -o /boot/grub/grub.cfg >/dev/null 2>&1
+		echo "  /etc/default/grub: + splash"
+	fi
+
+	if [ "$changed" = 1 ]; then
+		echo "  rebuilding the initramfs…"
+		asroot mkinitcpio -P >/dev/null
+	fi
+	echo "  boot splash ready — you will see it on the next boot"
+}
+
 # ---------------------------------------------------------------- default apps
 
 # Point common types at the apps Rayconfig ships, but never over a choice the
@@ -651,7 +711,8 @@ menu_toggle() {
 }
 menu_style() {
 	local c
-	c=$(printf '%s\n' '  Theme' '  Next theme' '  Light / dark' '  Font' '  Wallpaper' '  Next wallpaper' '  Edit this theme' | pick "Style" 7) || return 0
+	c=$(printf '%s\n' '  Theme' '  Next theme' '  Light / dark' '  Font' '  Wallpaper' '  Next wallpaper' \
+		'  Boot splash in this theme' '  Edit this theme' | pick "Style" 8) || return 0
 	case ${c#  } in
 	Theme) s_theme ;;
 	'Next theme') exec "$ROOT/bin/theme" next ;;
@@ -659,6 +720,7 @@ menu_style() {
 	Font) s_font ;;
 	Wallpaper) s_wallpaper ;;
 	'Next wallpaper') wallpaper_next ;;
+	'Boot splash in this theme') float_sh "'$ROOT/bin/ray' splash" ;;
 	'Edit this theme') exec foot -e "$ROOT/bin/ray" edit theme ;;
 	esac
 }
@@ -752,6 +814,7 @@ _render) render_settings ;;
 _set) set_ "$1" "${2:-}" ;; # ray _set kb_layout de — what the menus call
 _defaults) defaults ;;
 _saver) saver ;;
+splash) splash ;;
 install) if [ $# -gt 0 ] && [ "${1#-}" != "$1" ]; then exec "$ROOT/bootstrap/install.sh" "$@"; else install_pkg "${1:-}"; fi ;;
 remove) remove_pkg "${1:-}" ;;
 update | upgrade) update ;;

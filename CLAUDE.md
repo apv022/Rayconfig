@@ -69,7 +69,7 @@ features.
 ```
 install.sh                 mode detection: archiso -> full disk, Arch -> config
 bootstrap/iso-install.sh   partitioning, pacstrap, bootloader, user, handoff
-bootstrap/install.sh       stages: preflight packages link solarvim muhfm theme services verify
+bootstrap/install.sh       stages: preflight packages link solarvim muhfm theme splash services verify
 bin/                       ray (menus, settings, toggles, update, webapps…) + 10 tiny helpers
 bootstrap/tuis.txt         settings TUIs, installed one by one, missing ones skipped
                            solarvim is cloned to ~/.local/share/solarvim by the `solarvim` stage
@@ -77,7 +77,7 @@ bootstrap/tuis.txt         settings TUIs, installed one by one, missing ones ski
                            and built with `go` by the `muhfm` stage, only when its HEAD moved
 dots/                      hand-written configs; *.in are templates
 dots/shell/rc.sh           prompt/aliases/fm, sourced by one line the link stage adds to ~/.bashrc
-templates/                 outputs outside the repo (solarvim ray.lua, btop ray.theme)
+templates/                 outputs outside the repo (solarvim ray.lua, btop ray.theme, plymouth splash)
 data/emoji.txt             emoji picker list (plain data)
 themes/                    palette + committed generated wallpaper PNG
 tools/make-wallpaper.py    dev-only, stdlib Python, regenerate after palette edits
@@ -153,6 +153,21 @@ first — that is a missing render step, not a bad config.
 - **Every palette must define the same keys as sunset** (smoke and doctor
   check all of them). The font is not a palette key: it is `font=` in the
   settings state, rendered as `@font@`.
+- **Encrypted root (ISO)**: LUKS2 on the root partition, unlocked by
+  `sd-encrypt` with `rd.luks.name=<luks-uuid>=root root=/dev/mapper/root`.
+  HOOKS are `base systemd plymouth … keyboard sd-vconsole block sd-encrypt
+  filesystems fsck`: plymouth before sd-encrypt so it can ask for the password.
+  BIOS needs a separate unencrypted /boot (GRUB cannot read LUKS2/argon2).
+  The password reaches cryptsetup on stdin with no trailing newline, exactly
+  as it is typed at boot. A failed run leaves `/dev/mapper/root` open: the
+  script refuses to start until `cryptsetup close root`.
+- **The splash is text only**: the initramfs carries one font (whatever
+  `fc-match sans` is), so the plymouth script uses only characters every
+  Latin font has. A ☀ glyph would be an empty box. `ray splash` needs sudo and
+  rebuilds the initramfs, so theme switches never call it and `ray update`
+  does not run the splash stage; it only adds hooks/`splash`, never removes.
+  The script cannot be exercised without a real display: test on hardware or
+  a VM before claiming it renders.
 - **Fonts and colors share gen-theme**: changing the font re-runs gen-theme
   for the current theme; never hard-code a font name into a template.
 

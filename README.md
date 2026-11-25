@@ -34,9 +34,12 @@ It detects archiso and runs `bootstrap/iso-install.sh`, which:
 
 1. lists candidate disks (excluding the ISO medium) and asks which one to erase,
 2. asks for a username and password, and for you to type the disk name back,
-3. GPT-partitions the disk (1 GiB ESP + ext4 root on UEFI; bios_grub + ext4 on BIOS),
+3. GPT-partitions the disk (1 GiB ESP + root on UEFI; bios_grub + 1 GiB /boot + root on BIOS)
+   and **encrypts the root with LUKS2** — the same password you log in with
+   unlocks it at boot (`--no-encrypt` to skip),
 4. refreshes the keyring and `pacstrap`s Arch with a kernel, NetworkManager, sudo, git and curl,
-5. writes bootloader, locale, timezone, users and sudoers,
+5. writes bootloader, locale, timezone, users and sudoers, and a boot splash
+   in your theme (plymouth) that also asks for the disk password,
 6. installs Rayconfig into the new user's home and runs the config stage,
 7. installs solarvim, makes `nvim` mean solarvim, and starts sway on tty1 login,
 8. unmounts and tells you to reboot.
@@ -133,6 +136,8 @@ one script in `bin/`, or one line of config.
 | Omarchy | Rayconfig | where |
 |---|---|---|
 | one-command install from the ISO | same, `curl … \| sh` | `install.sh` |
+| full-disk encryption (LUKS) | on by default, one password for disk and login | `iso-install.sh` |
+| Plymouth boot splash | the palette's wordmark, pulsing; the disk password is typed on it | `ray splash`, Menu → Style |
 | Omarchy menu (Super+Alt+Space): apps, learn, trigger, style, setup, install, remove, update, about, system | same tree | `ray menu` |
 | keybindings cheat sheet | generated from the configs (desktop, editor, files) | `Super+/`, `ray keys` |
 | themes that restyle everything | 17 palettes → foot, sway, bar, mako, fuzzel, swaylock, muhfm, btop, GTK, wallpaper, Neovim | `ray theme`, `Super+T`, `Super+Ctrl+T` |
@@ -167,10 +172,10 @@ one script in `bin/`, or one line of config.
 | AUR helpers + AUR packages | official repos only | |
 | LazyVim (dozens of plugins) | solarvim: one file, zero plugins | `Super+N` |
 
-Not mapped yet, on purpose or for lack of a test machine: full-disk
-encryption, btrfs snapshots and a Plymouth splash all change the ISO
-installer, which has to be tested in a VM before it ships. LocalSend sharing
-and universal Super+C/V copy-paste need packages outside the official repos.
+Not mapped yet: btrfs snapshots (an "undo" for the whole system after a bad
+update — needs a btrfs install and a boot menu that lists snapshots),
+LocalSend (AirDrop-style sharing with your phone; AUR only) and universal
+Super+C/V copy-paste (needs a key-injection tool outside sway).
 
 ## Everyday use
 
@@ -237,8 +242,7 @@ ray edit          # open the repo in solarvim
 
 ## Roadmap
 
-- Disk encryption, btrfs snapshots and a boot splash in the ISO installer,
-  once each has been through a VM install.
+- Btrfs snapshots with a rollback entry in the boot menu.
 - Rounded corners / blur are not possible without swayfx (a sway fork, AUR).
   Deliberately left out.
 
