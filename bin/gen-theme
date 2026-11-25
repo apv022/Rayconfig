@@ -45,6 +45,14 @@ load() { # palette-file suffix outfile
 		[ -n "$k" ] && [ -n "$v" ] || die "bad palette line in $1: $line"
 		printf '%s%s=%s\n' "$k" "$2" "$v" >>"$3"
 		printf '%s%s_hex=%s\n' "$k" "$2" "$(printf '%s' "$v" | tr -d '#')" >>"$3"
+		# 0..1 floats for the boot splash script: "0.086, 0.075, 0.067"
+		case $v in '#'??????)
+			h=${v#?}
+			printf '%s%s_rgb=%s\n' "$k" "$2" "$(printf '%d %d %d' "0x$(echo "$h" | cut -c1-2)" \
+				"0x$(echo "$h" | cut -c3-4)" "0x$(echo "$h" | cut -c5-6)" |
+				awk '{ printf "%.3f, %.3f, %.3f", $1 / 255, $2 / 255, $3 / 255 }')" >>"$3"
+			;;
+		esac
 	done <"$1"
 }
 
@@ -127,6 +135,16 @@ if [ -f "$bt" ] && [ "$RENDER" = "$ROOT" ]; then
 	mkdir -p "$CFG/btop/themes"
 	render "$bt" "$CFG/btop/themes/ray.theme"
 	say "btop/themes/ray.theme"
+fi
+
+# The boot splash is rendered to state; `ray splash` (sudo) installs it into
+# /usr/share/plymouth and rebuilds the initramfs. Theme switches never sudo.
+if [ -d "$ROOT/templates/plymouth" ]; then
+	mkdir -p "$STATE/plymouth"
+	for t in "$ROOT"/templates/plymouth/*.in; do
+		render "$t" "$STATE/plymouth/$(basename "${t%.in}")"
+	done
+	say "boot splash (ray splash installs it)"
 fi
 
 # State: the active theme name, plus a shell file the utilities source.
