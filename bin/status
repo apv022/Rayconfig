@@ -17,6 +17,7 @@ BIN=$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")
 : "${RAY_URGENT:=#dc143c}" "${RAY_BG:=#0b0b0b}"
 
 out=
+setting() { sed -n "s/^$1=//p" "$STATE/settings" 2>/dev/null | tail -n1; }
 
 add() { # name text fg [bg]
 	out="$out${out:+,}{\"name\":\"$1\",\"full_text\":\"$2\",\"color\":\"$3\""
@@ -89,6 +90,7 @@ seg_bat() {
 			add bat " bat ${pct}%+ " "$RAY_ACCENT"
 			;;
 		Discharging)
+			if [ "$pct" -le 15 ] || [ "$(setting bar_battery)" != off ]; then :; else return 0; fi
 			if [ "$pct" -le 15 ]; then
 				add bat " bat ${pct}% " "$RAY_URGENT"
 				# warn once per discharge, as a sticky critical notification
@@ -100,7 +102,7 @@ seg_bat() {
 				add bat " bat ${pct}% " "$RAY_DIM"
 			fi
 			;;
-		*) add bat " bat ${pct}% " "$RAY_DIM" ;;
+		*) [ "$(setting bar_battery)" = off ] || add bat " bat ${pct}% " "$RAY_DIM" ;;
 		esac
 		return 0
 	done
@@ -120,15 +122,26 @@ seg_updates() {
 	return 0
 }
 
+# the active keyboard layout, only when there is more than one to switch between
+seg_kb() {
+	case $(setting kb_layout) in *,*) ;; *) return 0 ;; esac
+	command -v swaymsg >/dev/null 2>&1 || return 0
+	l=$(swaymsg -t get_inputs 2>/dev/null | sed -n 's/.*"xkb_active_layout_name": "\([^"]*\)".*/\1/p' | head -n1)
+	[ -n "$l" ] && add kb " $(printf '%s' "$l" | cut -c1-12) " "$RAY_DIM"
+	return 0
+}
+
 emit() {
 	out=
 	seg_flags
 	[ "${1:-}" = once ] || seg_updates
-	[ "${1:-}" = once ] || seg_cpu
+	[ "${1:-}" = once ] || [ "$(setting bar_cpu)" = off ] || seg_cpu
+	[ "${1:-}" = once ] || seg_kb
 	seg_net
 	seg_vol
 	seg_bat
-	add clock " $(date +'%a %d %b  %H:%M') " "$RAY_FG"
+	fmt=$(setting clock_format)
+	add clock " $(date +"${fmt:-%a %d %b  %H:%M}" | sed 's/"/\\"/g') " "$RAY_FG"
 	printf '[%s]\n' "$out"
 }
 
@@ -147,6 +160,7 @@ click() { # name button
 	rec:*) "$BIN/shot" record ;;
 	dnd:*) "$r" toggle dnd ;;
 	awake:*) "$r" toggle idle ;;
+	kb:*) swaymsg input type:keyboard xkb_switch_layout next >/dev/null ;;
 	clock:*) foot --app-id ray-float sh -c "cal -3; printf '\nPress Enter to close '; read -r _" ;;
 	esac
 }

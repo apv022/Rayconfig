@@ -35,12 +35,12 @@ for p in "$ROOT"/themes/*/palette; do
 	else
 		fail "$t: malformed palette line"
 	fi
-	[ -s "${p%palette}wallpaper.png" ] || fail "$t: wallpaper missing"
+	[ -s "${p%palette}wallpaper.jpg" ] || fail "$t: wallpaper.jpg missing"
 done
 
 printf '\nrender (into a copy)\n'
 tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT
+trap '[ -n "${KEEP:-}" ] || rm -rf "$tmp"' EXIT
 cp -R "$ROOT/dots" "$ROOT/themes" "$tmp/"
 for tdir in "$ROOT"/themes/*/; do
 	theme=$(basename "$tdir")
@@ -83,6 +83,26 @@ for tdir in "$ROOT"/themes/*/; do
 	fi
 done
 
+printf '\nsettings render (empty, partial, full)\n'
+for case in empty partial full; do
+	st=$tmp/st-$case
+	mkdir -p "$st/rayconfig" "$tmp/gen-$case"
+	case $case in
+	empty) : >"$st/rayconfig/settings" ;;
+	partial) printf 'kb_layout=de\ngaps=0\n' >"$st/rayconfig/settings" ;;
+	full) printf '%s\n' kb_layout=us,de kb_caps=caps:escape repeat_rate=50 mouse_accel=flat tap=enabled \
+		gaps=12 border=title bar_position=bottom bar_background=clear workspace_layout=tabbed >"$st/rayconfig/settings" ;;
+	esac
+	if out=$(cd "$tmp" && XDG_STATE_HOME=$st bash -c 'eval "$(sed -n "/^get() {/,/^}/p" "$1")"; SETTINGS=$2/rayconfig/settings; SWAYGEN=$3/85.conf; in_sway() { false; }; eval "$(sed -n "/^render_settings() {/,/^}/p" "$1")"; set -euo pipefail; render_settings' _ "$ROOT/bin/ray" "$st" "$tmp/gen-$case" 2>&1) &&
+		grep -q '^input "type:keyboard" {' "$tmp/gen-$case/85.conf"; then
+		pass "render_settings: $case"
+	else
+		fail "render_settings: $case: $out"
+	fi
+done
+grep -q '^bar main position bottom' "$tmp/gen-full/85.conf" && grep -q 'xkb_options grp:alt_shift_toggle,caps:escape' "$tmp/gen-full/85.conf" &&
+	pass "full settings render bar and keyboard options" || fail "full settings render incomplete"
+
 printf '\nbehavior\n'
 out=$( "$ROOT/bin/status" --once 2>/dev/null || true)
 case $out in
@@ -98,7 +118,7 @@ else
 fi
 
 for theme in sunset sunny; do
-	if [ -s "$ROOT/themes/$theme/wallpaper.png" ]; then
+	if [ -s "$ROOT/themes/$theme/wallpaper.jpg" ]; then
 		pass "$theme wallpaper present"
 	else
 		fail "$theme wallpaper missing"

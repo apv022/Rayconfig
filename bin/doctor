@@ -5,7 +5,7 @@
 # into an issue when the desktop misbehaves.
 set -uo pipefail
 
-ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+ROOT=$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)
 CFG=${XDG_CONFIG_HOME:-$HOME/.config}
 STATE=${XDG_STATE_HOME:-$HOME/.local/state}/rayconfig
 LOCAL_BIN=$HOME/.local/bin
@@ -104,8 +104,8 @@ for out in \
 done
 [ "$present" -eq 0 ] || good "$present generated file(s) present"
 [ "$stale" -eq 0 ] || meh "$stale generated file(s) older than the palette — run: ray theme $THEME"
-if [ -f "$STATE/wallpaper.png" ]; then
-	good "wallpaper: $(basename "$(readlink -f "$STATE/wallpaper.png")")"
+if [ -f "$STATE/wallpaper" ]; then
+	good "wallpaper: $(basename "$(dirname "$(readlink -f "$STATE/wallpaper")")")"
 else
 	bad "wallpaper missing — run: ray theme $THEME"
 fi

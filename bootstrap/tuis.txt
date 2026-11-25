@@ -22,3 +22,9 @@ poppler
 satty
 noto-fonts-emoji
 fwupd
+# Capture text and QR codes from the screen (Trigger → Capture)
+tesseract
+tesseract-data-eng
+zbar
+# Trigger → Speed test
+speedtest-cli

@@ -6,7 +6,15 @@
 case $- in *i*) ;; *) return 0 ;; esac
 
 export TERMINAL=${TERMINAL:-foot}
+# Settings → Defaults → Editor writes editor= to the settings state
+__ray_ed=$(sed -n 's/^editor=//p' "${XDG_STATE_HOME:-$HOME/.local/state}/rayconfig/settings" 2>/dev/null | tail -n1)
+if [ -n "$__ray_ed" ]; then export EDITOR="$__ray_ed" VISUAL="$__ray_ed"; fi
+unset __ray_ed
 export EDITOR=${EDITOR:-nvim}
+# Settings → Security → SSH agent
+if [ -z "${SSH_AUTH_SOCK:-}" ] && [ -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/ssh-agent.socket" ]; then
+	export SSH_AUTH_SOCK="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/ssh-agent.socket"
+fi
 
 HISTSIZE=20000
 HISTFILESIZE=20000

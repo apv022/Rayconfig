@@ -28,6 +28,11 @@ lock screen, file manager, btop, GTK's light/dark choice, wallpaper and Neovim.
 <p align="center"><img src="docs/media/themes.png" alt="nine of the seventeen themes" width="900"><br>
 <sub>Nine of the 17 themes. Everything in each shot — bar, borders, file manager, terminal, wallpaper — comes from one palette file.</sub></p>
 
+<p align="center"><img src="docs/media/wallpapers.jpg" alt="the Sun in six themes" width="900"><br>
+<sub>The wallpaper is the real Sun: NASA's Solar Dynamics Observatory (AIA 171 Å, courtesy of
+NASA/SDO and the AIA science team), recoloured from each palette by
+<code>tools/make-wallpaper.py</code>, so the palette stays the only source of colour.</sub></p>
+
 <sub>Screenshots are real: sway running headless, captured with grim. ¹ The splash
 preview is drawn by ffmpeg with the plymouth script's exact colours and layout;
 the splash itself shows only on a real boot.</sub>
@@ -114,31 +119,31 @@ st of Wayland. Alacritty is available with `--extras` if you want to A/B it.
 
 ## Settings without the command line
 
-`Super+I` opens the settings hub, a small floating list. Every item opens a
-graphical picker or a terminal app in a floating window:
+`Super+I` opens the settings hub; every item is a small floating list. Pick a
+value and it applies at once — no file to edit, nothing to restart.
 
-| setting | opens |
+<p align="center"><img src="docs/media/menus.png" alt="settings, keyboard, mouse & touchpad, appearance, clock and capture menus" width="900"></p>
+
+| group | what you can set |
 |---|---|
-| Wi-Fi | `impala`, else `nmtui` |
-| Bluetooth | `bluetui`, else `bluetoothctl` (starts the service for you) |
-| Sound | `wiremix`, else `pulsemixer` / `alsamixer` |
-| Display | pick a screen → scale or resolution |
-| Theme | all 17, with a one-line description each |
-| Font | any installed monospace family, applied to every app |
-| Wallpaper | any image in `~/Pictures/wallpapers`, or the theme's |
-| Keyboard layout, Touchpad | pick from a list |
-| Night light, Power profile | `wlsunset`, `power-profiles-daemon` |
-| Default apps | folders → muhfm, text → solarvim, images → imv, video → mpv, PDF → zathura |
-| DNS | automatic, Cloudflare, Quad9 or Google, via NetworkManager |
-| Timezone, Password | `timedatectl`, `passwd` |
-| Fingerprint | installs `fprintd`, enrolls, lets sudo and the lock screen accept it |
-| Autologin | log in on tty1 without a password (asks first) |
-| Updates, System monitor | `ray update`, `btop` |
-| Ask an agent | Claude Code inside this repo (or claude.ai/code) |
+| **Wi-Fi, Bluetooth, Sound** | `impala` / `nmtui`, `bluetui` / `bluetoothctl`, `wiremix` / `pulsemixer` |
+| **Display** | per screen: scale, resolution and refresh rate, position (left/right/above/below), rotation, on/off |
+| **Keyboard** | layouts (several, with a switch key: Alt+Shift, Ctrl+Shift, both Alts, Caps Lock, Super+Space), variant (intl, Dvorak, Colemak…), Caps Lock as Ctrl / Escape / Backspace / nothing, Compose key, repeat speed, repeat delay, Num Lock at start, your own keybindings |
+| **Mouse & touchpad** | mouse speed and acceleration, natural scrolling for each, touchpad speed, tap to click, scroll speed, ignore while typing, two-finger or corner right-click, touchpad on / off / off-with-a-mouse, touchscreen on/off |
+| **Idle & lock** | screensaver after, lock after, screen off after (or never), screensaver text, keep awake now |
+| **Night light** | on/off, warmth (4500K → candle), schedule |
+| **Power profile** | `power-profiles-daemon` |
+| **Appearance** | theme, next theme, light/dark, font, font size, background, icons, boot splash, screensaver text; **bar**: top/bottom, solid/clear, 8 clock formats, battery %, CPU; **windows**: gaps, borders or title bars, focus follows mouse, tabbed/stacked new workspaces, terminal transparency |
+| **Region & time** | timezone, language, formats (dates, numbers, money, paper), sync the clock |
+| **Network** | Wi-Fi, DNS (automatic, Cloudflare, Quad9, Google, custom), computer name, share Wi-Fi as a QR code, speed test |
+| **Security** | fingerprint, FIDO2 security key, SSH server, SSH agent, sudo without a password, autologin, password |
+| **Defaults** | apps per file type (folders → muhfm, text → solarvim, images → imv, video → mpv, PDF → zathura), web browser, editor |
+| **Git, Config** | name and email; open any config in the editor |
 
-Choices are stored in `~/.local/state/rayconfig/settings` (plain `key=value`)
-and rendered to `dots/sway/config.d/85-settings.conf` (gitignored), so they
-survive updates and you can still read every line.
+Every choice is one line in `~/.local/state/rayconfig/settings` (plain
+`key=value`, readable, deletable) and is rendered to
+`dots/sway/config.d/85-settings.conf` (gitignored), so it survives updates and
+you can still read every line sway runs.
 
 ## Omarchy, feature by feature
 
@@ -158,7 +163,25 @@ one script in `bin/`, or one line of config.
 | keybindings cheat sheet | generated from the configs (desktop, editor, files) | `Super+/`, `ray keys` |
 | themes that restyle everything | 17 palettes → foot, sway, bar, mako, fuzzel, swaylock, muhfm, btop, GTK, wallpaper, Neovim | `ray theme`, `Super+T`, `Super+Ctrl+T` |
 | next background | cycle theme wallpaper + `~/Pictures/wallpapers` | `Super+Ctrl+Space` |
-| font picker | one font for every app | Settings → Font |
+| font picker | one font for every app, plus font size | Appearance → Font, Font size |
+| icon theme picker | GTK icon themes, Papirus/Breeze/Adwaita installable | Appearance → Icons |
+| bar position, background, clock format, battery % | top/bottom, solid/clear, 8 clock formats, battery and CPU on/off | Appearance → Bar |
+| window gaps, borders, workspace layout | gaps size, border size or title bars, tabbed/stacked default, focus follows mouse | Appearance → Windows |
+| keyboard layouts, variants, Caps Lock / Compose, repeat | all of it, with a bar indicator for the active layout | Setup → Keyboard |
+| mouse / touchpad sensitivity, accel, scroll, tap, gestures | speed, acceleration, scroll speed, tap, dwt, click method, on/off | Setup → Mouse & touchpad |
+| idle timers | screensaver, lock, screen off — each adjustable or never | Setup → Idle & lock |
+| language and formats, hostname, custom DNS, Wi-Fi QR | `localectl`, `hostnamectl`, NetworkManager | Setup → Region, Network |
+| FIDO2, SSH server, SSH agent, passwordless sudo | `pam-u2f`, `openssh`, sudoers drop-in checked by `visudo` | Setup → Security |
+| default browser and editor | `xdg-settings`, `$EDITOR` for shells and muhfm | Setup → Defaults |
+| git setup | name, email, sane defaults | Setup → Git |
+| reminders | systemd user timers + a critical notification | Trigger → Reminder |
+| text and QR capture | `tesseract`, `zbar` | Trigger → Capture |
+| hardware toggles | laptop screen, touchpad, touchscreen | Trigger → Hardware |
+| network and disk speed tests | `speedtest-cli` (or a CDN download), `dd` | Trigger → Speed test |
+| install browser / terminal / editor / TUI / dev languages / AI | curated official-repo lists, installed ones ticked | Install |
+| restart audio, Wi-Fi, Bluetooth, touchpad | `systemctl`, `swaymsg` | Update → Restart |
+| sync time | `timedatectl` | Update → Sync the clock |
+| reboot into firmware setup | `systemctl reboot --firmware-setup` | System |
 | Hyprland | sway — bar, lock, idle and wallpaper ship in the box | |
 | Waybar with click actions | `swaybar` + `bin/status`: click wifi, volume (scroll/right-click), battery, clock, updates | `bin/status` |
 | Walker launcher | `fuzzel` | `Super+D` |
@@ -188,10 +211,13 @@ one script in `bin/`, or one line of config.
 | AUR helpers + AUR packages | official repos only | |
 | LazyVim (dozens of plugins) | solarvim: one file, zero plugins | `Super+N` |
 
-Not mapped yet: btrfs snapshots (an "undo" for the whole system after a bad
-update — needs a btrfs install and a boot menu that lists snapshots),
-LocalSend (AirDrop-style sharing with your phone; AUR only) and universal
-Super+C/V copy-paste (needs a key-injection tool outside sway).
+Not mapped, on purpose: Omarchy's plugin system and hooks (an extension point
+is exactly what Rayconfig refuses), AUR installs, the dock, animations and
+rounded corners (sway has none of these), Omarchy's release channels (Rayconfig
+follows `main`), dictation and games launchers. Not mapped yet: btrfs
+snapshots (an "undo" for the whole system after a bad update) and universal
+Super+C/V copy-paste. File sharing with your phone is going into
+[Sol](https://github.com/apv022/sol) instead of LocalSend.
 
 ## Everyday use
 
@@ -203,6 +229,7 @@ Super+C/V copy-paste (needs a key-injection tool outside sway).
 | `Super+E` | files (muhfm) |
 | `Super+Escape` | power menu |
 | `Super+Ctrl+V` · `Super+.` | clipboard history · emoji |
+| `Super+Alt+Space` → Trigger | capture (screenshot, record, OCR, QR, colour), reminders, hardware, speed tests |
 | `Super+Shift+S` · `Super+Alt+R` · `Super+Shift+C` | screenshot · record · colour picker |
 | `ray update` | pulls rayconfig, solarvim and muhfm, then updates Arch and installs anything new — on the running system, no reinstall |
 | bar | `↑ N updates` when Arch has updates; click anything to open its setting |
@@ -228,9 +255,10 @@ bin/                       ray, status, theme, gen-theme, doctor, keys, vol,
 dots/                      hand-written configs; *.in files are templates
 dots/shell/rc.sh           prompt, aliases, fm — sourced from ~/.bashrc
 templates/                 outputs that live outside the repo (solarvim, btop)
-themes/                    palette files + generated wallpaper PNGs
+themes/                    palette files + generated wallpaper JPEGs
 data/emoji.txt             the emoji picker's list
-tools/make-wallpaper.py    dev tool: regenerate wallpapers from a palette
+tools/make-wallpaper.py    dev tool: the Sun recoloured from a palette
+tools/sdo-sun-171.png      NASA/SDO image of the Sun, grayscale, the wallpaper's source
 test/smoke.sh              dependency-free smoke test
 ```
 

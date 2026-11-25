@@ -79,8 +79,9 @@ dots/                      hand-written configs; *.in are templates
 dots/shell/rc.sh           prompt/aliases/fm, sourced by one line the link stage adds to ~/.bashrc
 templates/                 outputs outside the repo (solarvim ray.lua, btop ray.theme, plymouth splash)
 data/emoji.txt             emoji picker list (plain data)
-themes/                    palette + committed generated wallpaper PNG
-tools/make-wallpaper.py    dev-only, stdlib Python, regenerate after palette edits
+themes/                    palette + committed generated wallpaper.jpg (the Sun, recoloured)
+tools/make-wallpaper.py    dev-only, stdlib Python (+ ffmpeg for the JPEG), regenerate after palette edits
+tools/sdo-sun-171.png      NASA/SDO 171 Å Sun, grayscale: the wallpaper's brightness map
 test/smoke.sh              dependency-free dev test
 ```
 
@@ -168,6 +169,20 @@ first — that is a missing render step, not a bad config.
   does not run the splash stage; it only adds hooks/`splash`, never removes.
   The script cannot be exercised without a real display: test on hardware or
   a VM before claiming it renders.
+- **`get` fails on an empty setting**, so `$(get k || echo default)` is how
+  defaults are written. A bare `$(get k)` in an assignment under `set -e`
+  aborts the script: always add `|| true` or a default. `render_settings` must
+  work with an empty, partial or full settings file (smoke covers all three):
+  a `grep` that matches nothing under `pipefail` once killed it silently.
+- **Settings menus are data, not plugins**: `choose key title default
+  'value|label'…` and `submenu title 'Label|function'…`. A new setting is one
+  `choose` line and, if sway needs it, one line in `render_settings`.
+- **The bar has `id main`** so `85-settings.conf` can say `bar main position
+  bottom` after `40-bar.conf` defined it.
+- **Scripts found through `~/.local/bin` symlinks** must resolve `readlink -f
+  "$0"` before computing `ROOT`, or they look for the repo in `~/.local`.
+- **Wallpapers are JPEG** (a photo is 10× smaller than PNG); the state link is
+  `~/.local/state/rayconfig/wallpaper` with no extension, swaybg sniffs it.
 - **Fonts and colors share gen-theme**: changing the font re-runs gen-theme
   for the current theme; never hard-code a font name into a template.
 

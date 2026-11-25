@@ -6,7 +6,9 @@
 #   shot save            select an area, save to ~/Pictures/screenshots
 #   shot full            whole output, saved
 #   shot edit            select an area, annotate it (satty), else save
-#   shot record [screen] [audio]   start/stop recording (~/Videos/recordings)
+#   shot record [screen] [audio|mic]   start/stop recording (~/Videos/recordings)
+#   shot text            select an area, copy the text in it (OCR, tesseract)
+#   shot qr              select a QR code, copy what it says (zbar)
 #   shot color           pick a pixel, copy its #hex
 set -eu
 
@@ -64,13 +66,33 @@ record)
 	if [ "${2:-region}" != screen ]; then
 		geo=$(slurp) || exit 0
 	fi
+	# desktop audio is the default sink's monitor; mic is the default source
 	audio=
-	[ "${3:-}" = audio ] && audio=--audio
+	case ${3:-} in
+	audio) audio="--audio=$(pactl get-default-sink 2>/dev/null).monitor" ;;
+	mic) audio=--audio ;;
+	esac
 	# shellcheck disable=SC2086 # $audio is one optional flag
 	nohup wf-recorder ${geo:+-g "$geo"} $audio -f "$f" >/dev/null 2>&1 &
 	printf '%s\n' "$!" >"$pidf"
 	printf '%s\n' "$f" >"$STATE/recording.file"
 	note "Recording" "Super+Alt+R again (or click ● REC in the bar) to stop"
+	;;
+text | ocr)
+	command -v tesseract >/dev/null 2>&1 || { note "Text capture" "needs tesseract: Install → Package → tesseract-data-eng"; exit 1; }
+	sel=$(slurp) || exit 0
+	txt=$(grim -g "$sel" - | tesseract - - 2>/dev/null | tr -d '\f')
+	[ -n "$txt" ] || { note "Text capture" "no text found"; exit 0; }
+	printf '%s' "$txt" | wl-copy
+	note "Text copied" "$(printf '%s' "$txt" | head -c 120)"
+	;;
+qr)
+	command -v zbarimg >/dev/null 2>&1 || { note "QR capture" "needs zbar: Install → Package → zbar"; exit 1; }
+	sel=$(slurp) || exit 0
+	txt=$(grim -g "$sel" -t png - | zbarimg -q --raw - 2>/dev/null)
+	[ -n "$txt" ] || { note "QR capture" "no QR code found"; exit 0; }
+	printf '%s' "$txt" | wl-copy
+	note "QR code copied" "$txt"
 	;;
 color | colour)
 	pos=$(slurp -p) || exit 0
@@ -81,7 +103,7 @@ color | colour)
 	printf '#%s\n' "$hex"
 	;;
 *)
-	printf 'usage: shot region|save|full|edit|record [screen] [audio]|color\n' >&2
+	printf 'usage: shot region|save|full|edit|record [screen] [audio|mic]|text|qr|color\n' >&2
 	exit 2
 	;;
 esac
