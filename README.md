@@ -16,6 +16,22 @@ Everforest, Kanagawa, Rosé Pine (and Dawn), Flexoki Light and Ristretto. One
 palette file drives the terminal, compositor, bar, notifications, launcher,
 lock screen, file manager, btop, GTK's light/dark choice, wallpaper and Neovim.
 
+<p align="center"><img src="docs/media/tour.gif" alt="Rayconfig: desktop, menu, settings, muhfm, themes" width="900"></p>
+
+| | |
+|---|---|
+| <img src="docs/media/desktop.png" alt="sway with muhfm and a terminal" width="440"> | <img src="docs/media/menu.png" alt="the ray menu (Super+Alt+Space)" width="440"> |
+| desktop: bar, muhfm, foot | `Super+Alt+Space`: everything in one menu |
+| <img src="docs/media/settings.png" alt="the settings hub (Super+I)" width="440"> | <img src="docs/media/splash.png" alt="boot splash in four themes" width="440"> |
+| `Super+I`: settings | boot splash with the disk password, per theme ¹ |
+
+<p align="center"><img src="docs/media/themes.png" alt="nine of the seventeen themes" width="900"><br>
+<sub>Nine of the 17 themes. Everything in each shot — bar, borders, file manager, terminal, wallpaper — comes from one palette file.</sub></p>
+
+<sub>Screenshots are real: sway running headless, captured with grim. ¹ The splash
+preview is drawn by ffmpeg with the plymouth script's exact colours and layout;
+the splash itself shows only on a real boot.</sub>
+
 ```
 themes/<name>/palette  ──►  bin/gen-theme  ──►  every config that has color
 ```
