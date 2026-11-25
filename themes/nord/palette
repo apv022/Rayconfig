@@ -1,0 +1,17 @@
+# nord (dark): arctic frost, after Nord
+bg=#2e3440
+bg2=#3b4252
+bg3=#434c5e
+fg=#eceff4
+dim=#7b88a1
+sun=#ebcb8b
+amber=#e5b97a
+orange=#d08770
+red=#bf616a
+green=#a3be8c
+teal=#8fbcbb
+blue=#81a1c1
+purple=#b48ead
+accent=#88c0d0
+urgent=#bf616a
+variant=dark

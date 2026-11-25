@@ -59,6 +59,10 @@ lightp=$RENDER/themes/sunny/palette
 load "$darkp" "_dark" "$dart"
 load "$lightp" "_light" "$lite"
 printf 'theme=%s\n' "$theme" >>"$cur"
+# The font is a setting, not a colour, but every template that has a colour
+# also names a font, so it rides along. `ray font` changes it.
+font=$(sed -n 's/^font=//p' "$STATE/settings" 2>/dev/null | tail -n1)
+printf 'font=%s\n' "${font:-JetBrains Mono}" >>"$cur"
 
 # foot 1.26+ renamed [colors] to [colors-dark]/[colors-light]. Pick the section
 # that matches the palette's variant instead of hard-coding the old name.
@@ -114,6 +118,15 @@ if [ -f "$sv" ]; then
 	else
 		say "solarvim not found; skipping colorscheme (RAY_SOLARVIM=1 to force)"
 	fi
+fi
+
+# btop reads themes from its own config dir; btop.conf is btop's to rewrite,
+# so only the theme file is ours (install.sh points color_theme at it once).
+bt="$ROOT/templates/btop-ray.theme.in"
+if [ -f "$bt" ] && [ "$RENDER" = "$ROOT" ]; then
+	mkdir -p "$CFG/btop/themes"
+	render "$bt" "$CFG/btop/themes/ray.theme"
+	say "btop/themes/ray.theme"
 fi
 
 # State: the active theme name, plus a shell file the utilities source.

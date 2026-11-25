@@ -35,7 +35,11 @@ features.
 2. **Never build an extension point.** The moment a helper gains a
    `load_module()` hook, it has become the plugin system we refused to install.
 3. **Cap the utilities.** If an idea needs a new helper, it should replace one
-   of the existing ~11. No sprawling `bin/` directory.
+   of the existing 11. No sprawling `bin/` directory. New features become a
+   function in `bin/ray` (settings, toggles, menus are one function each) or a
+   new verb on an existing script (`shot record`, `bright kbd`).
+   **Omarchy parity is a goal:** every Omarchy feature should have an
+   equivalent (README has the map), built this way — never a framework.
 4. **Use what ships.** Sway provides bar, lock, idle, wallpaper, nag. The bar
    is a shell script speaking i3bar JSON to `swaybar` on stdin — not a bar with
    modules. Not Hyprland (plugin-shaped), not swayfx (AUR fork: no blur or
@@ -65,12 +69,16 @@ features.
 ```
 install.sh                 mode detection: archiso -> full disk, Arch -> config
 bootstrap/iso-install.sh   partitioning, pacstrap, bootloader, user, handoff
-bootstrap/install.sh       stages: preflight packages link solarvim theme services verify
-bin/                       ray (settings, update, menu, keys, ask) + ~10 tiny helpers
+bootstrap/install.sh       stages: preflight packages link solarvim muhfm theme services verify
+bin/                       ray (menus, settings, toggles, update, webapps…) + 10 tiny helpers
 bootstrap/tuis.txt         settings TUIs, installed one by one, missing ones skipped
                            solarvim is cloned to ~/.local/share/solarvim by the `solarvim` stage
+                           muhfm (file manager, one Go file) is cloned to ~/.local/share/muhfm
+                           and built with `go` by the `muhfm` stage, only when its HEAD moved
 dots/                      hand-written configs; *.in are templates
-templates/                 outputs outside the repo (solarvim ray.lua)
+dots/shell/rc.sh           prompt/aliases/fm, sourced by one line the link stage adds to ~/.bashrc
+templates/                 outputs outside the repo (solarvim ray.lua, btop ray.theme)
+data/emoji.txt             emoji picker list (plain data)
 themes/                    palette + committed generated wallpaper PNG
 tools/make-wallpaper.py    dev-only, stdlib Python, regenerate after palette edits
 test/smoke.sh              dependency-free dev test
@@ -89,6 +97,7 @@ prints every action without touching anything. `ray doctor` is read-only.
 shellcheck -S warning -x install.sh bootstrap/*.sh bin/* test/smoke.sh
 ./test/smoke.sh                                  # palette parity, render, tokens, bar JSON
 sway --validate -c ~/.config/sway/config          # need a config dir with the theme rendered
+# without a seat/GPU (containers): WLR_BACKENDS=headless WLR_RENDERER=pixman XDG_RUNTIME_DIR=…
 foot --check-config --config ~/.config/foot/foot.ini
 ray doctor                                       # full install check, exit 1 on real breakage
 ```
@@ -128,6 +137,24 @@ first — that is a missing render step, not a bad config.
   in the same invocation. An install older than that needs `ray update` twice.
 - **Tool detection**: `curl` and `git` are not in Arch's `base` package. A bare
   archinstall cannot fetch this installer.
+- **swayidle lives in `ray`**, not the sway config: `ray startup` → `ray idle`,
+  so Super+Ctrl+I can pause it. The screensaver is fullscreen, so its
+  `inhibit_idle none` rule must come *after* the catch-all
+  `inhibit_idle fullscreen` rules in 10-defaults, or the screen never locks.
+- **The bar is bash and reads clicks**: the header must say
+  `"click_events":true`, and the loop waits with `read -t 2` instead of
+  `sleep`. If stdin closes, `read` returns at once; the loop sleeps then so it
+  never spins. `--once` must stay valid JSON (smoke + doctor check it).
+- **muhfm's default branch must have `main.go`**: the stage skips with a
+  warning on the old Python checkout. Its keys come from `muhfm --keys`.
+- **OSD replaces in place** with `notify-send -p` / `-r` (libnotify ≥ 0.8) and
+  mako's `[app-name=ray-osd]` section; without those it degrades to plain
+  notifications.
+- **Every palette must define the same keys as sunset** (smoke and doctor
+  check all of them). The font is not a palette key: it is `font=` in the
+  settings state, rendered as `@font@`.
+- **Fonts and colors share gen-theme**: changing the font re-runs gen-theme
+  for the current theme; never hard-code a font name into a template.
 
 ## Safety
 

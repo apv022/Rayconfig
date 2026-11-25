@@ -1,0 +1,11 @@
+# muhfm — the file manager (Super+E). Plain key = value; every key optional.
+# Colours come from foot, so muhfm follows the theme. `muhfm --help` lists keys.
+terminal = foot
+editor = env NVIM_APPNAME=solarvim nvim
+preview = true
+places = true
+details = true
+sort = name
+dirs_first = true
+hidden = false
+icons = none

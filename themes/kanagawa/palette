@@ -1,0 +1,17 @@
+# kanagawa (dark): ink and woodblock, after Kanagawa
+bg=#1f1f28
+bg2=#2a2a37
+bg3=#363646
+fg=#dcd7ba
+dim=#727169
+sun=#e6c384
+amber=#c0a36e
+orange=#ffa066
+red=#e46876
+green=#98bb6c
+teal=#7aa89f
+blue=#7e9cd8
+purple=#957fb8
+accent=#7e9cd8
+urgent=#e82424
+variant=dark

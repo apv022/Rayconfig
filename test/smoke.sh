@@ -25,17 +25,25 @@ sh -n "$ROOT/install.sh" || fail "install.sh"
 
 printf '\nthemes\n'
 keys() { grep -vE '^[[:space:]]*(#|$)' "$1" | cut -d= -f1 | sort; }
-if [ "$(keys "$ROOT/themes/sunset/palette")" = "$(keys "$ROOT/themes/sunny/palette")" ]; then
-	pass "sunset/sunny palette parity"
-else
-	fail "palette keys differ"
-fi
+ref=$(keys "$ROOT/themes/sunset/palette")
+for p in "$ROOT"/themes/*/palette; do
+	t=$(basename "$(dirname "$p")")
+	if [ "$(keys "$p")" != "$ref" ]; then
+		fail "$t: palette keys differ from sunset"
+	elif ! grep -vE '^[[:space:]]*(#|$|variant=)' "$p" | grep -qvE '^[a-z0-9]+=#[0-9a-fA-F]{6}$'; then
+		pass "$t: palette complete and well-formed"
+	else
+		fail "$t: malformed palette line"
+	fi
+	[ -s "${p%palette}wallpaper.png" ] || fail "$t: wallpaper missing"
+done
 
 printf '\nrender (into a copy)\n'
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 cp -R "$ROOT/dots" "$ROOT/themes" "$tmp/"
-for theme in sunset sunny; do
+for tdir in "$ROOT"/themes/*/; do
+	theme=$(basename "$tdir")
 	if RAY_RENDER_ROOT="$tmp" XDG_CONFIG_HOME="$tmp/none" XDG_STATE_HOME="$tmp/state" \
 		"$ROOT/bin/gen-theme" "$theme" >/dev/null; then
 		pass "gen-theme $theme"
@@ -59,8 +67,7 @@ for theme in sunset sunny; do
 	else
 		fail "$theme: theme.sh missing"
 	fi
-	section=dark
-	[ "$theme" = sunny ] && section=light
+	section=$(sed -n 's/^variant=//p' "$ROOT/themes/$theme/palette")
 	if grep -q "^\[colors-$section\]" "$tmp/dots/foot/foot.ini" &&
 		grep -q "^initial-color-theme=$section" "$tmp/dots/foot/foot.ini" &&
 		! sed -n '/^\[main\]/,/^\[/p' "$tmp/dots/foot/foot.ini" | grep -q '^alpha='; then

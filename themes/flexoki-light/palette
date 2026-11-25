@@ -1,0 +1,17 @@
+# flexoki-light (light): ink on warm paper, after Flexoki
+bg=#fffcf0
+bg2=#f2f0e5
+bg3=#e6e4d9
+fg=#100f0f
+dim=#6f6e69
+sun=#ad8301
+amber=#9b7701
+orange=#bc5215
+red=#af3029
+green=#66800b
+teal=#24837b
+blue=#205ea6
+purple=#5e409d
+accent=#205ea6
+urgent=#af3029
+variant=light

@@ -13,6 +13,8 @@ mako
 grim
 slurp
 wl-copy
+wl-paste
+cliphist
 brightnessctl
 wpctl
 sed

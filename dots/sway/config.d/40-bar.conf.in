@@ -3,7 +3,7 @@ bar {
 	status_command ~/.local/bin/status
 	position top
 	height 30
-	font pango:JetBrains Mono 10
+	font pango:@font@ 10
 	status_padding 6
 	status_edge_padding 10
 	workspace_min_width 30

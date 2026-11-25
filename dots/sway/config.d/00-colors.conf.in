@@ -7,3 +7,6 @@ set $fg      @fg@
 set $dim     @dim@
 set $accent  @accent@
 set $urgent  @urgent@
+
+# font: ray font (Super+I → Font) writes it to settings; rendered here
+font pango:@font@ 9

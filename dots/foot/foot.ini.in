@@ -2,7 +2,7 @@
 # foot >= 1.26: colors live in [colors-dark]/[colors-light], alpha moves there
 # too, and osc52 lives in [security]. Values are RRGGBB with no leading '#'.
 [main]
-font=JetBrains Mono:size=11
+font=@font@:size=11
 pad=10x10
 dpi-aware=yes
 term=foot

@@ -1,0 +1,17 @@
+# catppuccin (dark): pastel mocha, after Catppuccin Mocha
+bg=#1e1e2e
+bg2=#262637
+bg3=#313244
+fg=#cdd6f4
+dim=#7f849c
+sun=#f9e2af
+amber=#f5c78e
+orange=#fab387
+red=#f38ba8
+green=#a6e3a1
+teal=#94e2d5
+blue=#89b4fa
+purple=#cba6f7
+accent=#cba6f7
+urgent=#f38ba8
+variant=dark

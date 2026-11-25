@@ -1,19 +1,40 @@
 #!/bin/sh
-# vol — volume, without a UI toolkit.
+# vol — volume, without a UI toolkit. Shows a small OSD bubble (mako).
 #
-#   vol up [step] | vol down [step] | vol mute | vol set <0-100>
+#   vol up [step] | vol down [step] | vol mute | vol mic | vol set <0-100>
 set -eu
 
 command -v wpctl >/dev/null 2>&1 || exit 1
 step=${2:-5}
+STATE=${XDG_STATE_HOME:-$HOME/.local/state}/rayconfig
+
+# One notification replaced in place (notify-send -r), styled by mako's
+# [app-name=ray-osd] section with a progress bar.
+osd() { # text percent
+	command -v notify-send >/dev/null 2>&1 || return 0
+	mkdir -p "$STATE"
+	id=$(cat "$STATE/osd.id" 2>/dev/null || true)
+	new=$(notify-send -a ray-osd -p ${id:+-r "$id"} -h "int:value:$2" -t 1200 "$1" 2>/dev/null) &&
+		printf '%s\n' "$new" >"$STATE/osd.id" || notify-send -a ray-osd -h "int:value:$2" -t 1200 "$1" 2>/dev/null || true
+}
+
+show() {
+	raw=$(wpctl get-volume "${1:-@DEFAULT_AUDIO_SINK@}" 2>/dev/null) || return 0
+	pct=$(printf '%s' "$raw" | awk '{printf "%d", $2 * 100}')
+	case $raw in
+	*MUTED*) osd "${2:-Volume}  muted" 0 ;;
+	*) osd "${2:-Volume}  $pct%" "$pct" ;;
+	esac
+}
 
 case ${1:-} in
-up) wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ "${step}%+" >/dev/null ;;
-down) wpctl set-volume @DEFAULT_AUDIO_SINK@ "${step}%-" >/dev/null ;;
-mute) wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle >/dev/null ;;
-set) wpctl set-volume @DEFAULT_AUDIO_SINK@ "${2:?percent}/100" >/dev/null ;;
+up) wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ "${step}%+" >/dev/null && show ;;
+down) wpctl set-volume @DEFAULT_AUDIO_SINK@ "${step}%-" >/dev/null && show ;;
+mute) wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle >/dev/null && show ;;
+mic) wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle >/dev/null && show @DEFAULT_AUDIO_SOURCE@ Microphone ;;
+set) wpctl set-volume @DEFAULT_AUDIO_SINK@ "${2:?percent}/100" >/dev/null && show ;;
 *)
-	printf 'usage: vol up|down [step] | mute | set <0-100>\n' >&2
+	printf 'usage: vol up|down [step] | mute | mic | set <0-100>\n' >&2
 	exit 2
 	;;
 esac

@@ -1,35 +1,87 @@
 #!/bin/sh
-# shot — screenshots with grim, no wrapper app.
+# shot — screenshots, screen recording and a colour picker. grim, slurp,
+# wf-recorder; no wrapper app.
 #
-#   shot region   select an area, copy to clipboard
-#   shot full     whole output, saved to ~/Pictures/screenshots
-#   shot save     select an area, saved to ~/Pictures/screenshots
+#   shot region          select an area, copy to clipboard
+#   shot save            select an area, save to ~/Pictures/screenshots
+#   shot full            whole output, saved
+#   shot edit            select an area, annotate it (satty), else save
+#   shot record [screen] [audio]   start/stop recording (~/Videos/recordings)
+#   shot color           pick a pixel, copy its #hex
 set -eu
 
+STATE=${XDG_STATE_HOME:-$HOME/.local/state}/rayconfig
 dir=${RAY_SHOT_DIR:-$HOME/Pictures/screenshots}
+vids=${RAY_RECORD_DIR:-$HOME/Videos/recordings}
 stamp() { date +%Y%m%d-%H%M%S; }
+note() { command -v notify-send >/dev/null 2>&1 && notify-send -a ray "$@" || true; }
 
 case ${1:-region} in
 region)
 	sel=$(slurp) || exit 0
 	grim -g "$sel" - | wl-copy
-	printf 'shot: region copied\n'
+	note "Screenshot" "copied to the clipboard"
 	;;
 save)
 	mkdir -p "$dir"
 	sel=$(slurp) || exit 0
 	f="$dir/$(stamp).png"
 	grim -g "$sel" "$f"
+	note "Screenshot" "$f"
 	printf 'shot: %s\n' "$f"
 	;;
 full)
 	mkdir -p "$dir"
 	f="$dir/$(stamp).png"
 	grim "$f"
+	note "Screenshot" "$f"
 	printf 'shot: %s\n' "$f"
 	;;
+edit)
+	mkdir -p "$dir"
+	sel=$(slurp) || exit 0
+	f="$dir/$(stamp).png"
+	if command -v satty >/dev/null 2>&1; then
+		grim -g "$sel" - | satty --filename - --output-filename "$f" --copy-command wl-copy --early-exit
+	else
+		grim -g "$sel" "$f"
+		note "Screenshot" "saved (install satty to annotate): $f"
+	fi
+	;;
+record)
+	pidf=$STATE/recording.pid
+	if [ -f "$pidf" ] && kill -0 "$(cat "$pidf")" 2>/dev/null; then
+		kill -INT "$(cat "$pidf")"
+		rm -f "$pidf"
+		note "Recording saved" "$(cat "$STATE/recording.file" 2>/dev/null)"
+		exit 0
+	fi
+	rm -f "$pidf"
+	command -v wf-recorder >/dev/null 2>&1 || { note "Recording" "wf-recorder is not installed — run ray update"; exit 1; }
+	mkdir -p "$vids" "$STATE"
+	f="$vids/$(stamp).mp4"
+	geo=
+	if [ "${2:-region}" != screen ]; then
+		geo=$(slurp) || exit 0
+	fi
+	audio=
+	[ "${3:-}" = audio ] && audio=--audio
+	# shellcheck disable=SC2086 # $audio is one optional flag
+	nohup wf-recorder ${geo:+-g "$geo"} $audio -f "$f" >/dev/null 2>&1 &
+	printf '%s\n' "$!" >"$pidf"
+	printf '%s\n' "$f" >"$STATE/recording.file"
+	note "Recording" "Super+Alt+R again (or click ● REC in the bar) to stop"
+	;;
+color | colour)
+	pos=$(slurp -p) || exit 0
+	# a 1×1 binary PPM: the last three bytes are the pixel
+	hex=$(grim -g "$pos" -t ppm - | tail -c 3 | od -An -tx1 | tr -d ' \n')
+	printf '#%s' "$hex" | wl-copy -n
+	note "Colour #$hex" "copied to the clipboard"
+	printf '#%s\n' "$hex"
+	;;
 *)
-	printf 'usage: shot region|save|full\n' >&2
+	printf 'usage: shot region|save|full|edit|record [screen] [audio]|color\n' >&2
 	exit 2
 	;;
 esac

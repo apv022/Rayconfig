@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 # ray — the one command you need to remember. Everything is also in the
-# menus (Super+I settings, Super+Alt+Space system), so you never need it.
+# menus (Super+Alt+Space system, Super+I settings), so you never need it.
+#
+# Every feature is one small function below. No plugins, no hooks, no
+# module loader: to change something, edit the function.
 set -euo pipefail
 
 ROOT=$(cd -- "$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)
 STATE=${XDG_STATE_HOME:-$HOME/.local/state}/rayconfig
 CFG=${XDG_CONFIG_HOME:-$HOME/.config}
-SV=${XDG_DATA_HOME:-$HOME/.local/share}/solarvim
+DATA=${XDG_DATA_HOME:-$HOME/.local/share}
+SV=$DATA/solarvim
+MF=$DATA/muhfm
+APPS=$DATA/applications
 SETTINGS=$STATE/settings
 SWAYGEN=$ROOT/dots/sway/config.d/85-settings.conf # gitignored, generated
 
@@ -16,20 +22,30 @@ else H='' G='' R='' Z=''; fi
 step() { printf '\n%s● %s%s\n' "$H" "$*" "$Z"; }
 note() { if command -v notify-send >/dev/null 2>&1; then notify-send -a ray "$@" || true; fi; }
 have() { command -v "$1" >/dev/null 2>&1; }
+in_sway() { have swaymsg && swaymsg -t get_version >/dev/null 2>&1; }
 
 usage() {
 	cat <<EOF
 ${H}ray${Z} — Rayconfig
 
-  ray settings         settings hub (Super+I): wifi, bluetooth, sound, display,
-                       theme, keyboard, touchpad, night light, power, wallpaper
-  ray update           update everything: Arch, rayconfig, solarvim, new packages
-  ray menu [power]     system menu (Super+Alt+Space / Super+Escape)
-  ray keys [sway|vim]  cheat sheets (Super+/)
-  ray theme [name]     sunset | sunny | dusk | moss | toggle
+  ray menu [name]      system menu (Super+Alt+Space); name: apps learn capture
+                       toggle style setup install remove update about power
+  ray settings [what]  settings hub (Super+I)
+  ray update           update everything: Arch, rayconfig, solarvim, muhfm
+  ray theme [name]     any theme in themes/, toggle, next, prev, list
+  ray font             pick the font for every app
+  ray wallpaper [next] pick or cycle the wallpaper
+  ray toggle <what>    nightlight idle dnd bar gaps opacity
+  ray clipboard        clipboard history (Super+Ctrl+V)
+  ray emoji            emoji picker (Super+.)
+  ray webapp add NAME URL | remove | list
+  ray install [pkg]    pick a package from the official repos
+  ray remove [pkg]     pick an installed package to remove
+  ray keys [sway|vim|fm] cheat sheets (Super+/)
+  ray screensaver      start it now
   ray ask              open an AI agent inside your config repo
   ray doctor           health check, read-only
-  ray edit [what]      sway | foot | mako | fuzzel | swaylock | theme | vim | local
+  ray edit [what]      sway | foot | mako | fuzzel | swaylock | muhfm | theme | vim | local
 EOF
 }
 
@@ -37,7 +53,14 @@ EOF
 
 # fuzzel is the GUI: every choice is a small floating list, no typing needed.
 pick() { # prompt [lines] — choices on stdin
-	fuzzel --dmenu --prompt "$1  " --lines "${2:-10}" --width 38 2>/dev/null
+	fuzzel --dmenu --prompt "$1  " --lines "${2:-10}" --width 44 2>/dev/null
+}
+# a one-line text box: fuzzel with no list
+ask_text() { # prompt
+	fuzzel --dmenu --prompt "$1  " --lines 0 --width 60 </dev/null 2>/dev/null
+}
+confirm() { # question
+	[ "$(printf 'No\nYes\n' | pick "$1" 2)" = Yes ]
 }
 # Run a TUI in a centred floating terminal; keep it open if it fails.
 tui() { # title cmd...
@@ -45,9 +68,10 @@ tui() { # title cmd...
 	shift
 	exec foot --app-id ray-float --title "$title" sh -c '"$@" || { printf "\nPress Enter to close "; read -r _; }' sh "$@"
 }
+# A shell snippet in a floating terminal that waits for Enter at the end.
 float_sh() { exec foot --app-id ray-float sh -c "$1; printf '\nPress Enter to close '; read -r _"; }
 
-# ---------------------------------------------------------------- settings
+# ---------------------------------------------------------------- settings state
 
 # State is a plain key=value file; 85-settings.conf is rendered from it.
 get() { sed -n "s/^$1=//p" "$SETTINGS" 2>/dev/null | tail -n1; }
@@ -76,8 +100,14 @@ render_settings() {
 		w=$(get wallpaper || true)
 		if [ -n "$w" ]; then echo "output * bg \"$w\" fill"; fi
 	} | sed '/xkb_layout $/d; /natural_scroll $/d; /	tap $/d' >"$SWAYGEN"
-	if have swaymsg && swaymsg -t get_version >/dev/null 2>&1; then swaymsg reload >/dev/null 2>&1 || true; fi
+	if in_sway; then swaymsg reload >/dev/null 2>&1 || true; fi
 }
+# flags: tiny files the bar reads to show what is switched on
+flag() { [ -e "$STATE/flag.$1" ]; }
+flag_set() { mkdir -p "$STATE" && : >"$STATE/flag.$1"; }
+flag_clear() { rm -f "$STATE/flag.$1"; }
+
+# ---------------------------------------------------------------- settings
 
 s_wifi() {
 	if have impala; then tui "Wi-Fi" impala; else tui "Wi-Fi" nmtui; fi
@@ -109,9 +139,44 @@ s_display() {
 	note "Display" "$out: $what $choice"
 }
 s_theme() {
-	local t
-	t=$(find "$ROOT/themes" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort | pick "Theme" 8) || return 0
+	local t cur
+	cur=$(cat "$STATE/theme" 2>/dev/null || echo sunset)
+	t=$("$ROOT/bin/theme" list | while read -r n; do
+		v=$(sed -n 's/^variant=//p' "$ROOT/themes/$n/palette")
+		d=$(sed -n '1s/^# [^:]*: *//p' "$ROOT/themes/$n/palette")
+		mark=' '
+		[ "$n" = "$cur" ] && mark='●'
+		printf '%s %-17s %-5s  %s\n' "$mark" "$n" "$v" "$d"
+	done | pick "Theme" 17) || return 0
+	t=$(printf '%s' "$t" | awk '{print $2}')
 	"$ROOT/bin/theme" "$t"
+}
+s_font() {
+	have fc-list || { note "Font" "fontconfig is missing"; return 0; }
+	local f
+	# monospace families first: the terminal, editor and bar all use this one
+	f=$(fc-list :spacing=mono family | cut -d, -f1 | sort -u | pick "Font ($(get font || echo 'JetBrains Mono'))" 15) || return 0
+	set_ font "$f"
+	"$ROOT/bin/gen-theme" "$(cat "$STATE/theme" 2>/dev/null || echo sunset)" >/dev/null
+	if in_sway; then swaymsg reload >/dev/null 2>&1 || true; fi
+	have makoctl && makoctl reload 2>/dev/null || true
+	note "Font" "$f — new terminal windows use it. More fonts: Super+Alt+Space → Install → Font"
+}
+s_wallpaper() {
+	local dir=$HOME/Pictures/wallpapers f
+	mkdir -p "$dir"
+	f=$( { echo "theme default"; find "$dir" -maxdepth 1 -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) -printf '%f\n' | sort; } |
+		pick "Wallpaper (~/Pictures/wallpapers)" 10) || return 0
+	if [ "$f" = "theme default" ]; then set_ wallpaper ""; else set_ wallpaper "$dir/$f"; fi
+}
+wallpaper_next() {
+	local dir=$HOME/Pictures/wallpapers cur list n i
+	cur=$(get wallpaper || true)
+	list=$( { echo ""; find "$dir" -maxdepth 1 -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) 2>/dev/null | sort; })
+	n=$(printf '%s\n' "$list" | wc -l)
+	i=$(printf '%s\n' "$list" | grep -nxF -- "$cur" | head -n1 | cut -d: -f1)
+	i=$(( ${i:-1} % n + 1 ))
+	set_ wallpaper "$(printf '%s\n' "$list" | sed -n "${i}p")"
 }
 s_keyboard() {
 	local l
@@ -133,9 +198,11 @@ s_nightlight() {
 	have wlsunset || { note "Night light" "wlsunset is not installed — run ray update"; return 0; }
 	if pkill -x wlsunset; then
 		set_ nightlight off
+		flag_clear nightlight
 		note "Night light" "off"
 	else
 		set_ nightlight on
+		flag_set nightlight
 		setsid -f wlsunset -S 07:00 -s 19:30 -t 3800 >/dev/null 2>&1
 		note "Night light" "on (warm from 19:30 to 07:00)"
 	fi
@@ -146,36 +213,320 @@ s_power() {
 	p=$(powerprofilesctl list | sed -n 's/^[* ] *\([a-z-]*\):$/\1/p' | pick "Power profile ($(powerprofilesctl get))" 3) || return 0
 	powerprofilesctl set "$p" && note "Power" "$p"
 }
-s_wallpaper() {
-	local dir=$HOME/Pictures/wallpapers f
-	mkdir -p "$dir"
-	f=$( { echo "theme default"; find "$dir" -maxdepth 1 -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) -printf '%f\n' | sort; } |
-		pick "Wallpaper (~/Pictures/wallpapers)" 10) || return 0
-	if [ "$f" = "theme default" ]; then set_ wallpaper ""; else set_ wallpaper "$dir/$f"; fi
+s_defaults() {
+	defaults
+	note "Default apps" "folders → muhfm, text → solarvim, images → imv, video → mpv, PDF → zathura (where installed). Change one: o then Ctrl+D in muhfm."
+}
+# DNS for the active NetworkManager connection.
+s_dns() {
+	have nmcli || { note "DNS" "NetworkManager is not installed"; return 0; }
+	local con c dns
+	con=$(nmcli -t -f NAME connection show --active | head -n1)
+	[ -n "$con" ] || { note "DNS" "no active connection"; return 0; }
+	c=$(printf '%s\n' 'Automatic (from the network)' 'Cloudflare 1.1.1.1' 'Quad9 9.9.9.9' 'Google 8.8.8.8' | pick "DNS for $con" 4) || return 0
+	case $c in
+	Automatic*) dns='' ;;
+	Cloudflare*) dns='1.1.1.1 1.0.0.1' ;;
+	Quad9*) dns='9.9.9.9 149.112.112.112' ;;
+	Google*) dns='8.8.8.8 8.8.4.4' ;;
+	esac
+	if [ -z "$dns" ]; then
+		nmcli connection modify "$con" ipv4.dns '' ipv4.ignore-auto-dns no
+	else
+		nmcli connection modify "$con" ipv4.dns "$dns" ipv4.ignore-auto-dns yes
+	fi
+	nmcli connection up "$con" >/dev/null 2>&1 || true
+	note "DNS" "$con: $c"
+}
+s_timezone() {
+	local z
+	z=$(timedatectl list-timezones | pick "Timezone ($(timedatectl show -p Timezone --value 2>/dev/null))" 15) || return 0
+	float_sh "timedatectl set-timezone '$z' && echo 'Timezone: $z'"
+}
+s_password() { tui "Password" passwd; }
+# Fingerprint login for sudo and the lock screen (fprintd, official repos).
+s_fingerprint() {
+	float_sh "set -e
+echo 'Fingerprint: installs fprintd, enrolls a finger, and lets sudo and the'
+echo 'lock screen accept it (the password keeps working). Ctrl+C to stop.'
+sudo pacman -S --needed --noconfirm fprintd
+fprintd-enroll
+for f in /etc/pam.d/sudo /etc/pam.d/swaylock; do
+	[ -f \"\$f\" ] || continue
+	grep -q pam_fprintd \"\$f\" || sudo sed -i '1a auth sufficient pam_fprintd.so' \"\$f\"
+	echo \"  \$f: fingerprint accepted\"
+done"
+}
+# Log straight in on tty1 (disk encryption, if any, still asks first).
+s_autologin() {
+	local d=/etc/systemd/system/getty@tty1.service.d tmp
+	if [ -f "$d/autologin.conf" ]; then
+		confirm "Autologin is on. Turn it off?" || return 0
+		float_sh "sudo rm -f '$d/autologin.conf' && echo 'Autologin off.'"
+	else
+		confirm "Log in automatically on tty1 (no password at boot)?" || return 0
+		tmp=$(mktemp)
+		cat >"$tmp" <<EOF
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty -o '-p -f -- \\\\u' --noclear --autologin $USER %I \$TERM
+EOF
+		float_sh "sudo install -Dm644 '$tmp' '$d/autologin.conf' && rm -f '$tmp' && echo 'Autologin on for $USER.'"
+	fi
 }
 
 settings() {
 	local c
 	case ${1:-} in '') ;; *) "s_$1"; return ;; esac
 	c=$(printf '%s\n' \
-		'  Wi-Fi' '  Bluetooth' '  Sound' '  Display' '  Theme' '  Wallpaper' \
-		'  Keyboard layout' '  Touchpad' '  Night light' '  Power profile' \
-		'  Updates' '  System monitor' '  Ask an agent' | pick "Settings" 13) || return 0
+		'  Wi-Fi' '  Bluetooth' '  Sound' '  Display' '  Theme' '  Font' '  Wallpaper' \
+		'  Keyboard layout' '  Touchpad' '  Night light' '  Power profile' '  Default apps' \
+		'  DNS' '  Timezone' '  Password' '  Fingerprint' '  Autologin' \
+		'  Updates' '  System monitor' '  Ask an agent' | pick "Settings" 20) || return 0
 	case ${c#  } in
 	Wi-Fi) s_wifi ;;
 	Bluetooth) s_bluetooth ;;
 	Sound) s_sound ;;
 	Display) s_display ;;
 	Theme) s_theme ;;
+	Font) s_font ;;
 	Wallpaper) s_wallpaper ;;
 	'Keyboard layout') s_keyboard ;;
 	Touchpad) s_touchpad ;;
 	'Night light') s_nightlight ;;
 	'Power profile') s_power ;;
+	'Default apps') s_defaults ;;
+	DNS) s_dns ;;
+	Timezone) s_timezone ;;
+	Password) s_password ;;
+	Fingerprint) s_fingerprint ;;
+	Autologin) s_autologin ;;
 	Updates) float_sh "'$ROOT/bin/ray' update" ;;
 	'System monitor') if have btop; then tui "System" btop; else tui "System" top; fi ;;
 	'Ask an agent') ask ;;
 	esac
+}
+
+# ---------------------------------------------------------------- toggles
+
+# swayidle, run by ray so it can be paused: screensaver, lock, screen off.
+idle_start() {
+	pkill -x swayidle 2>/dev/null || true
+	flag_clear awake
+	local saver=()
+	[ "$(get screensaver || echo on)" = off ] || saver=(timeout 240 "$ROOT/bin/ray screensaver" resume "$ROOT/bin/ray screensaver stop")
+	setsid -f swayidle -w \
+		"${saver[@]}" \
+		timeout 300 'swaylock -f' \
+		timeout 600 'swaymsg "output * power off"' resume 'swaymsg "output * power on"' \
+		before-sleep 'swaylock -f' >/dev/null 2>&1
+}
+
+toggle() {
+	case ${1:-} in
+	nightlight) s_nightlight ;;
+	idle | awake)
+		if pgrep -x swayidle >/dev/null; then
+			pkill -x swayidle
+			flag_set awake
+			note "Keep awake" "on — no lock, no screen off. Super+Ctrl+I to undo."
+		else
+			idle_start
+			note "Keep awake" "off — locks after 5 minutes again"
+		fi
+		;;
+	dnd)
+		have makoctl || return 0
+		makoctl mode -t do-not-disturb >/dev/null
+		if makoctl mode | grep -q do-not-disturb; then flag_set dnd; else
+			flag_clear dnd
+			note "Do not disturb" "off"
+		fi
+		;;
+	bar) swaymsg bar mode toggle >/dev/null ;;
+	gaps)
+		if flag nogaps; then
+			flag_clear nogaps
+			swaymsg 'gaps inner all set 8, gaps outer all set 4' >/dev/null
+		else
+			flag_set nogaps
+			swaymsg 'gaps inner all set 0, gaps outer all set 0' >/dev/null
+		fi
+		;;
+	opacity)
+		if flag opaque; then
+			flag_clear opaque
+			swaymsg opacity 0.92 >/dev/null
+		else
+			flag_set opaque
+			swaymsg opacity 1 >/dev/null
+		fi
+		;;
+	screensaver)
+		if [ "$(get screensaver || echo on)" = off ]; then set_ screensaver on; else set_ screensaver off; fi
+		idle_start
+		note "Screensaver" "$(get screensaver)"
+		;;
+	*)
+		echo "usage: ray toggle nightlight|idle|dnd|bar|gaps|opacity|screensaver" >&2
+		return 2
+		;;
+	esac
+}
+
+# ---------------------------------------------------------------- screensaver
+
+# A fullscreen foot window drawing the sun drifting around in theme colours.
+# Any key closes it; swayidle closes it on mouse movement.
+screensaver() {
+	case ${1:-} in
+	stop)
+		pkill -f 'app-id ray-screensaver' 2>/dev/null || true
+		return 0
+		;;
+	esac
+	pgrep -f 'app-id ray-screensaver' >/dev/null && return 0
+	setsid -f foot --app-id ray-screensaver "$ROOT/bin/ray" _saver >/dev/null 2>&1
+}
+saver() {
+	local cols rows x=3 y=2 dx=1 dy=1 c=0 k
+	local art=('    \ | /    ' '  ‒‒ ☀ ‒‒   ' '    / | \    ' '' '  rayconfig  ')
+	trap 'printf "\033[?25h\033[0m"; clear' EXIT
+	printf '\033[?25l'
+	while :; do
+		cols=$(tput cols) rows=$(tput lines)
+		printf '\033[2J'
+		local i
+		for i in "${!art[@]}"; do
+			printf '\033[%d;%dH\033[%dm%s' $((y + i)) "$x" $((31 + c % 6)) "${art[$i]}"
+		done
+		x=$((x + dx)) y=$((y + dy))
+		[ "$x" -le 1 ] || [ "$x" -ge $((cols - 14)) ] && { dx=$((-dx)); c=$((c + 1)); }
+		[ "$y" -le 1 ] || [ "$y" -ge $((rows - 5)) ] && { dy=$((-dy)); c=$((c + 1)); }
+		if IFS= read -rsn1 -t 0.12 k; then break; fi
+	done
+	: "${k:-}"
+}
+
+# ---------------------------------------------------------------- pickers: clipboard, emoji, apps
+
+clipboard() {
+	have cliphist || { note "Clipboard" "cliphist is not installed — run ray update"; return 0; }
+	local c
+	c=$(cliphist list | pick "Clipboard history" 15) || return 0
+	printf '%s' "$c" | cliphist decode | wl-copy
+}
+
+emoji() {
+	local e
+	e=$(grep -v '^#' "$ROOT/data/emoji.txt" | pick "Emoji" 15) || return 0
+	printf '%s' "${e%% *}" | wl-copy -n
+	note "Emoji" "${e%% *} copied — paste with Ctrl+V"
+}
+
+browser() {
+	local b
+	for b in ${BROWSER:-} chromium brave firefox librewolf google-chrome-stable vivaldi-stable; do
+		have "$b" && exec "$b" "$@"
+	done
+	note "Browser" "no browser installed — Super+Alt+Space → Install → Package (chromium or firefox)"
+}
+
+# ---------------------------------------------------------------- web apps
+
+# A web app is a desktop entry that opens a site in its own app window.
+slug() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-//; s/-$//'; }
+webapp() {
+	local sub=${1:-} name url b exec_line f
+	case $sub in
+	add)
+		name=${2:-$(ask_text "Web app name")} || return 0
+		url=${3:-$(ask_text "Address (https://…)")} || return 0
+		[ -n "$name" ] && [ -n "$url" ] || return 0
+		case $url in http*://*) ;; *) url="https://$url" ;; esac
+		exec_line="xdg-open $url"
+		for b in chromium brave google-chrome-stable vivaldi-stable; do
+			if have "$b"; then exec_line="$b --app=$url"; break; fi
+		done
+		mkdir -p "$APPS"
+		f="$APPS/ray-webapp-$(slug "$name").desktop"
+		cat >"$f" <<EOF
+[Desktop Entry]
+Type=Application
+Name=$name
+Comment=Web app: $url
+Exec=$exec_line
+Icon=web-browser
+Categories=Network;WebApp;
+X-Rayconfig-WebApp=$url
+EOF
+		note "Web app" "$name is in the launcher (Super+D)"
+		;;
+	remove)
+		name=$(grep -l '^X-Rayconfig-WebApp=' "$APPS"/ray-webapp-*.desktop 2>/dev/null |
+			xargs -r -n1 sed -n 's/^Name=//p' | pick "Remove web app" 10) || return 0
+		rm -f "$APPS/ray-webapp-$(slug "$name").desktop"
+		note "Web app" "$name removed"
+		;;
+	list) grep -H '^X-Rayconfig-WebApp=' "$APPS"/ray-webapp-*.desktop 2>/dev/null | sed 's|.*/ray-webapp-||; s|\.desktop:X-Rayconfig-WebApp=|  |' ;;
+	*) echo "usage: ray webapp add [NAME URL] | remove | list" >&2; return 2 ;;
+	esac
+}
+
+# ---------------------------------------------------------------- packages
+
+install_pkg() {
+	local p=${1:-}
+	[ -n "$p" ] || p=$(pacman -Slq | sort -u | pick "Install (official repos)" 15) || return 0
+	float_sh "sudo pacman -S --needed '$p'"
+}
+install_font() {
+	local p
+	p=$(pacman -Slq | grep -E '^(ttf|otf)-' | sort -u | pick "Install font" 15) || return 0
+	float_sh "sudo pacman -S --needed '$p' && fc-cache -f && echo 'Now: Settings → Font'"
+}
+remove_pkg() {
+	local p=${1:-}
+	[ -n "$p" ] || p=$(pacman -Qeq | pick "Remove package" 15) || return 0
+	float_sh "sudo pacman -Rns '$p'"
+}
+
+# ---------------------------------------------------------------- default apps
+
+# Point common types at the apps Rayconfig ships, but never over a choice the
+# user made in ~/.config/mimeapps.list (muhfm: o, then Ctrl+D).
+defaults() {
+	have xdg-mime || return 0
+	mkdir -p "$APPS"
+	cat >"$APPS/solarvim.desktop" <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=solarvim
+GenericName=Text Editor
+Comment=Neovim with the Rayconfig palette
+Exec=env NVIM_APPNAME=solarvim nvim %F
+Terminal=true
+Icon=nvim
+Categories=Utility;TextEditor;
+MimeType=text/plain;text/markdown;text/x-shellscript;application/x-shellscript;text/x-python;text/x-csrc;text/x-chdr;text/x-c++src;text/x-go;text/x-lua;text/x-rust;application/json;application/toml;application/x-yaml;text/x-log;
+EOF
+	local user=$CFG/mimeapps.list
+	setdef() { # desktop-id mime...
+		local d=$1 m cur
+		shift
+		[ -f "$APPS/$d" ] || [ -f "/usr/share/applications/$d" ] || return 0
+		for m; do
+			cur=$(sed -n "s|^$m=\([^;]*\).*|\1|p" "$user" 2>/dev/null | head -n1)
+			case $cur in '' | "$d") xdg-mime default "$d" "$m" ;; esac
+		done
+	}
+	setdef muhfm.desktop inode/directory
+	setdef solarvim.desktop text/plain text/markdown text/x-shellscript application/x-shellscript \
+		text/x-python text/x-csrc text/x-chdr text/x-go text/x-lua application/json application/toml application/x-yaml
+	setdef imv.desktop image/png image/jpeg image/gif image/webp image/bmp image/tiff image/svg+xml
+	setdef mpv.desktop video/mp4 video/x-matroska video/webm video/quicktime video/x-msvideo \
+		audio/mpeg audio/flac audio/ogg audio/x-wav audio/mp4 audio/opus
+	setdef org.pwmt.zathura.desktop application/pdf application/epub+zip
 }
 
 # ---------------------------------------------------------------- agent
@@ -216,11 +567,13 @@ update() {
 	pull "$ROOT" rayconfig
 	step "solarvim"
 	pull "$SV" solarvim
+	step "muhfm"
+	pull "$MF" muhfm
 	exec "$ROOT/bin/ray" _update_rest
 }
 update_rest() {
 	step "Arch packages + anything new in the package lists"
-	"$ROOT/bootstrap/install.sh" --only packages,link,solarvim,theme --yes | grep -vE '^ ok ' || true
+	"$ROOT/bootstrap/install.sh" --only packages,link,solarvim,muhfm,theme --yes | grep -vE '^ ok ' || true
 	render_settings
 	step "check"
 	if "$ROOT/bin/doctor" >/dev/null 2>&1; then
@@ -234,30 +587,158 @@ update_rest() {
 	fi
 	note "System updated" "Everything is current."
 }
-
-# ---------------------------------------------------------------- menu
-
-menu() {
-	local cmd
-	if [ "${1:-}" = power ]; then
-		cmd=$(printf '  Lock\n  Suspend\n  Log out\n  Reboot\n  Power off\n' | pick "Power" 5) || exit 0
-	else
-		cmd=$(printf '%s\n' '  Settings' '  Update system' '  Keyboard shortcuts' '  Ask an agent' \
-			'  Health check' '  Edit config' '  Lock' '  Suspend' '  Log out' '  Reboot' '  Power off' |
-			pick "ray" 11) || exit 0
+# Restart the long-running pieces without logging out.
+restart() {
+	have makoctl && { makoctl reload 2>/dev/null || { pkill -x mako; setsid -f mako; }; }
+	idle_start
+	pkill -f 'wl-paste --watch cliphist' 2>/dev/null || true
+	if have cliphist; then
+		setsid -f wl-paste --watch cliphist store >/dev/null 2>&1
+		setsid -f wl-paste --type image --watch cliphist store >/dev/null 2>&1
 	fi
-	case ${cmd#  } in
-	Settings) settings ;;
-	'Update system') float_sh "'$ROOT/bin/ray' update" ;;
-	'Keyboard shortcuts') exec foot --app-id ray-float -e "$ROOT/bin/keys" --pager ;;
-	'Ask an agent') ask ;;
-	'Health check') float_sh "'$ROOT/bin/doctor'" ;;
-	'Edit config') exec foot -e "$ROOT/bin/ray" edit ;;
+	in_sway && swaymsg reload >/dev/null # restarts the bar too
+	note "Restarted" "notifications, idle, clipboard history, bar"
+}
+
+# ---------------------------------------------------------------- menus
+
+menu_learn() {
+	local c
+	c=$(printf '%s\n' '  All shortcuts' '  File manager keys' '  Editor keys' '  Rayconfig manual' \
+		'  Sway manual' '  Arch Wiki' | pick "Learn" 6) || return 0
+	case ${c#  } in
+	'All shortcuts') exec foot --app-id ray-float -e "$ROOT/bin/keys" --pager ;;
+	'File manager keys') exec foot --app-id ray-float -e "$ROOT/bin/keys" --pager fm ;;
+	'Editor keys') exec foot --app-id ray-float -e "$ROOT/bin/keys" --pager vim ;;
+	'Rayconfig manual') exec foot --app-id ray-float -e less "$ROOT/README.md" ;;
+	'Sway manual') exec foot --app-id ray-float -e man 5 sway ;;
+	'Arch Wiki') exec xdg-open https://wiki.archlinux.org ;;
+	esac
+}
+menu_capture() {
+	local c rec='  Record screen region'
+	[ -f "$STATE/recording.pid" ] && rec='  Stop recording'
+	c=$(printf '%s\n' '  Screenshot region → clipboard' '  Screenshot region → file' '  Screenshot screen → file' \
+		'  Screenshot region → annotate' "$rec" '  Record whole screen with audio' '  Pick a colour' | pick "Capture" 7) || return 0
+	case ${c#  } in
+	'Screenshot region → clipboard') exec "$ROOT/bin/shot" region ;;
+	'Screenshot region → file') exec "$ROOT/bin/shot" save ;;
+	'Screenshot screen → file') exec "$ROOT/bin/shot" full ;;
+	'Screenshot region → annotate') exec "$ROOT/bin/shot" edit ;;
+	'Record screen region' | 'Stop recording') exec "$ROOT/bin/shot" record ;;
+	'Record whole screen with audio') exec "$ROOT/bin/shot" record screen audio ;;
+	'Pick a colour') exec "$ROOT/bin/shot" color ;;
+	esac
+}
+onoff() { if "$@"; then echo on; else echo off; fi; }
+menu_toggle() {
+	local c
+	c=$(printf '%s\n' \
+		"  Night light ($(onoff flag nightlight))" \
+		"  Keep awake ($(onoff flag awake))" \
+		"  Do not disturb ($(onoff flag dnd))" \
+		"  Screensaver ($(get screensaver || echo on))" \
+		'  Bar' '  Gaps' '  Window transparency' | pick "Toggle" 7) || return 0
+	case ${c#  } in
+	Night*) toggle nightlight ;;
+	Keep*) toggle idle ;;
+	Do*) toggle dnd ;;
+	Screensaver*) toggle screensaver ;;
+	Bar) toggle bar ;;
+	Gaps) toggle gaps ;;
+	Window*) toggle opacity ;;
+	esac
+}
+menu_style() {
+	local c
+	c=$(printf '%s\n' '  Theme' '  Next theme' '  Light / dark' '  Font' '  Wallpaper' '  Next wallpaper' '  Edit this theme' | pick "Style" 7) || return 0
+	case ${c#  } in
+	Theme) s_theme ;;
+	'Next theme') exec "$ROOT/bin/theme" next ;;
+	'Light / dark') exec "$ROOT/bin/theme" toggle ;;
+	Font) s_font ;;
+	Wallpaper) s_wallpaper ;;
+	'Next wallpaper') wallpaper_next ;;
+	'Edit this theme') exec foot -e "$ROOT/bin/ray" edit theme ;;
+	esac
+}
+menu_install() {
+	local c
+	c=$(printf '%s\n' '  Package' '  Web app' '  Font' '  Recommended apps' | pick "Install" 4) || return 0
+	case ${c#  } in
+	Package) install_pkg ;;
+	'Web app') webapp add ;;
+	Font) install_font ;;
+	'Recommended apps') float_sh "'$ROOT/bootstrap/install.sh' --only packages --extras" ;;
+	esac
+}
+menu_remove() {
+	local c
+	c=$(printf '%s\n' '  Package' '  Web app' | pick "Remove" 2) || return 0
+	case ${c#  } in
+	Package) remove_pkg ;;
+	'Web app') webapp remove ;;
+	esac
+}
+menu_update() {
+	local c
+	c=$(printf '%s\n' '  Everything' '  Firmware' '  Restart desktop pieces' '  Refresh configs' | pick "Update" 4) || return 0
+	case ${c#  } in
+	Everything) float_sh "'$ROOT/bin/ray' update" ;;
+	Firmware) if have fwupdmgr; then float_sh "fwupdmgr refresh --force; fwupdmgr update"; else note "Firmware" "fwupd is not installed — run ray update"; fi ;;
+	'Restart desktop pieces') restart ;;
+	'Refresh configs') float_sh "'$ROOT/bootstrap/install.sh' --only link,muhfm,theme --yes" ;;
+	esac
+}
+menu_power() {
+	local c items=('  Lock' '  Screensaver' '  Suspend')
+	[ "$(wc -l </proc/swaps)" -gt 1 ] && items+=('  Hibernate')
+	items+=('  Log out' '  Reboot' '  Power off')
+	c=$(printf '%s\n' "${items[@]}" | pick "Power" "${#items[@]}") || exit 0
+	case ${c#  } in
 	Lock) exec swaylock -f ;;
+	Screensaver) screensaver ;;
 	Suspend) exec systemctl suspend ;;
+	Hibernate) exec systemctl hibernate ;;
 	'Log out') exec swaymsg exit ;;
 	Reboot) exec systemctl reboot ;;
 	'Power off') exec systemctl poweroff ;;
+	esac
+}
+
+menu() {
+	local c
+	case ${1:-} in
+	'') ;;
+	apps) exec fuzzel ;;
+	learn) menu_learn; return ;;
+	capture) menu_capture; return ;;
+	toggle) menu_toggle; return ;;
+	style) menu_style; return ;;
+	setup | settings) settings; return ;;
+	install) menu_install; return ;;
+	remove) menu_remove; return ;;
+	update) menu_update; return ;;
+	about) float_sh "fastfetch 2>/dev/null || uname -a" ;;
+	power | system) menu_power; return ;;
+	*) echo "ray menu: unknown menu $1" >&2; return 2 ;;
+	esac
+	c=$(printf '%s\n' '  Apps' '  Learn' '  Capture' '  Toggle' '  Style' '  Setup' '  Install' \
+		'  Remove' '  Update' '  About' '  Ask an agent' '  Health check' '  System' | pick "ray" 13) || exit 0
+	case ${c#  } in
+	Apps) exec fuzzel ;;
+	Learn) menu_learn ;;
+	Capture) menu_capture ;;
+	Toggle) menu_toggle ;;
+	Style) menu_style ;;
+	Setup) settings ;;
+	Install) menu_install ;;
+	Remove) menu_remove ;;
+	Update) menu_update ;;
+	About) float_sh "fastfetch 2>/dev/null || uname -a" ;;
+	'Ask an agent') ask ;;
+	'Health check') float_sh "'$ROOT/bin/doctor'" ;;
+	System) menu_power ;;
 	esac
 }
 
@@ -266,30 +747,58 @@ menu() {
 sub=${1:-}
 [ $# -gt 0 ] && shift
 case $sub in
-settings | set) settings "$@" ;;
+settings | set | setup) settings "$@" ;;
 _render) render_settings ;;
 _set) set_ "$1" "${2:-}" ;; # ray _set kb_layout de — what the menus call
-install) exec "$ROOT/bootstrap/install.sh" "$@" ;;
+_defaults) defaults ;;
+_saver) saver ;;
+install) if [ $# -gt 0 ] && [ "${1#-}" != "$1" ]; then exec "$ROOT/bootstrap/install.sh" "$@"; else install_pkg "${1:-}"; fi ;;
+remove) remove_pkg "${1:-}" ;;
 update | upgrade) update ;;
 _update_rest) update_rest ;;
+restart) restart ;;
 menu) menu "$@" ;;
 ask) ask ;;
 doctor) exec "$ROOT/bin/doctor" "$@" ;;
 theme) exec "$ROOT/bin/theme" "${@:-toggle}" ;;
+font) s_font ;;
+wallpaper) if [ "${1:-}" = next ]; then wallpaper_next; else s_wallpaper; fi ;;
+toggle) toggle "$@" ;;
+idle) idle_start ;;
+screensaver) screensaver "$@" ;;
+clipboard) clipboard ;;
+emoji) emoji ;;
+browser) browser "$@" ;;
+webapp) webapp "$@" ;;
 status) exec "$ROOT/bin/status" "${@:---once}" ;;
 keys) exec "$ROOT/bin/keys" "$@" ;;
 startup) # run once per sway start
-	[ "$(get nightlight || true)" = on ] && have wlsunset && setsid -f wlsunset -S 07:00 -s 19:30 -t 3800 >/dev/null 2>&1
+	idle_start
+	if have cliphist; then
+		setsid -f wl-paste --watch cliphist store >/dev/null 2>&1
+		setsid -f wl-paste --type image --watch cliphist store >/dev/null 2>&1
+	fi
+	flag_clear dnd
+	flag_clear awake
+	flag_clear nogaps
+	flag_clear opaque
+	if [ "$(get nightlight || true)" = on ] && have wlsunset; then
+		flag_set nightlight
+		setsid -f wlsunset -S 07:00 -s 19:30 -t 3800 >/dev/null 2>&1
+	else
+		flag_clear nightlight
+	fi
 	[ -f "$STATE/welcomed" ] && exit 0
 	mkdir -p "$STATE" && : >"$STATE/welcomed"
-	note "Welcome to Rayconfig" "Super+I  settings
+	note "Welcome to Rayconfig" "Super+Alt+Space  menu
+Super+I  settings
 Super+/  every shortcut
-Super+Alt+Space  menu"
+Super+E  files"
 	;;
 edit)
 	ed=${EDITOR:-nvim}
 	case ${1:-} in
-	sway | foot | mako | fuzzel | swaylock) exec "$ed" "$ROOT/dots/$1" ;;
+	sway | foot | mako | fuzzel | swaylock | muhfm) exec "$ed" "$ROOT/dots/$1" ;;
 	theme | palette) exec "$ed" "$ROOT/themes/$(cat "$STATE/theme" 2>/dev/null || echo sunset)/palette" ;;
 	vim | solarvim) exec "$ed" "$CFG/solarvim/init.lua" ;;
 	local) exec "$ed" "$CFG/sway/config.d/90-local.conf" ;;

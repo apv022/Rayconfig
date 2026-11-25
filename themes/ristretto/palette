@@ -1,0 +1,17 @@
+# ristretto (dark): espresso and cream, after Monokai Pro Ristretto
+bg=#2c2525
+bg2=#352d2d
+bg3=#403838
+fg=#fff1f3
+dim=#948a8b
+sun=#f9cc6c
+amber=#e8b85c
+orange=#f38d70
+red=#fd6883
+green=#adda78
+teal=#85dacc
+blue=#a8a9eb
+purple=#c39ac9
+accent=#f9cc6c
+urgent=#fd6883
+variant=dark

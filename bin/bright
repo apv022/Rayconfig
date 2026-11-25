@@ -1,18 +1,43 @@
 #!/bin/sh
-# bright — backlight, no daemon.
+# bright — backlight and keyboard light, no daemon. Shows an OSD bubble.
 #
 #   bright up [step] | bright down [step] | bright set <0-100>
+#   bright kbd up | bright kbd down
 set -eu
 
 command -v brightnessctl >/dev/null 2>&1 || exit 1
-step=${2:-5}
+STATE=${XDG_STATE_HOME:-$HOME/.local/state}/rayconfig
 
+osd() { # text percent — same bubble as vol
+	command -v notify-send >/dev/null 2>&1 || return 0
+	mkdir -p "$STATE"
+	id=$(cat "$STATE/osd.id" 2>/dev/null || true)
+	new=$(notify-send -a ray-osd -p ${id:+-r "$id"} -h "int:value:$2" -t 1200 "$1" 2>/dev/null) &&
+		printf '%s\n' "$new" >"$STATE/osd.id" || notify-send -a ray-osd -h "int:value:$2" -t 1200 "$1" 2>/dev/null || true
+}
+# brightnessctl -m: device,class,current,percent,max
+show() { pct=$(brightnessctl -m "$@" | cut -d, -f4 | tr -d %); osd "${label:-Brightness}  $pct%" "$pct"; }
+
+if [ "${1:-}" = kbd ]; then
+	dev=$(brightnessctl -l -m -c leds 2>/dev/null | cut -d, -f1 | grep -m1 kbd_backlight) || exit 0
+	label=Keyboard
+	case ${2:-} in
+	up) brightnessctl -d "$dev" set 25%+ >/dev/null ;;
+	down) brightnessctl -d "$dev" set 25%- >/dev/null ;;
+	*) printf 'usage: bright kbd up|down\n' >&2; exit 2 ;;
+	esac
+	show -d "$dev"
+	exit 0
+fi
+
+step=${2:-5}
 case ${1:-} in
 up) brightnessctl set "${step}%+" >/dev/null ;;
-down) brightnessctl set "${step}%-" >/dev/null ;;
+down) brightnessctl -n set "${step}%-" >/dev/null ;;
 set) brightnessctl set "${2:?percent}%" >/dev/null ;;
 *)
-	printf 'usage: bright up|down [step] | set <0-100>\n' >&2
+	printf 'usage: bright up|down [step] | set <0-100> | kbd up|down\n' >&2
 	exit 2
 	;;
 esac
+show

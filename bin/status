@@ -1,13 +1,15 @@
-#!/bin/sh
-# status — the entire bar. swaybar reads i3bar JSON from stdin.
+#!/usr/bin/env bash
+# status — the entire bar. swaybar reads i3bar JSON from stdin, and with
+# click_events on it writes clicks back to ours.
 #
 #   status          loop forever (what sway runs)
 #   status --once   one line, for tests
 #
-# No jq, no modules, no plugin API. Reads sysfs, wpctl, swaymsg.
+# No jq, no modules, no plugin API. Reads sysfs, /proc, wpctl, state flags.
 set -eu
 
 STATE=${XDG_STATE_HOME:-$HOME/.local/state}/rayconfig
+BIN=$(dirname -- "$(readlink -f "${BASH_SOURCE[0]}")")
 
 # shellcheck disable=SC1090,SC1091
 [ -f "$STATE/theme.sh" ] && . "$STATE/theme.sh"
@@ -20,6 +22,16 @@ add() { # name text fg [bg]
 	out="$out${out:+,}{\"name\":\"$1\",\"full_text\":\"$2\",\"color\":\"$3\""
 	[ -n "${4:-}" ] && out="$out,\"background\":\"$4\""
 	out="$out,\"separator\":false,\"separator_block_width\":14}"
+}
+
+# indicators for things you switched on, so nothing is on by surprise
+seg_flags() {
+	local p
+	p=$(cat "$STATE/recording.pid" 2>/dev/null || true)
+	if [ -n "$p" ] && kill -0 "$p" 2>/dev/null; then add rec " ● REC " "$RAY_BG" "$RAY_URGENT"; fi
+	[ -e "$STATE/flag.dnd" ] && add dnd " dnd " "$RAY_ACCENT"
+	[ -e "$STATE/flag.awake" ] && add awake " awake " "$RAY_ACCENT"
+	return 0
 }
 
 seg_net() {
@@ -42,6 +54,20 @@ seg_net() {
 	add net " offline " "$RAY_DIM"
 }
 
+# CPU load from /proc/stat deltas between two bar updates
+cpu_prev_total=0 cpu_prev_idle=0
+seg_cpu() {
+	local _ u n s i w q sq st total idle pct
+	read -r _ u n s i w q sq st _ </proc/stat
+	total=$((u + n + s + i + w + q + sq + st))
+	idle=$((i + w))
+	if [ "$cpu_prev_total" -gt 0 ] && [ "$total" -gt "$cpu_prev_total" ]; then
+		pct=$((100 * ((total - cpu_prev_total) - (idle - cpu_prev_idle)) / (total - cpu_prev_total)))
+		if [ "$pct" -ge 80 ]; then add cpu " cpu ${pct}% " "$RAY_URGENT"; else add cpu " cpu ${pct}% " "$RAY_DIM"; fi
+	fi
+	cpu_prev_total=$total cpu_prev_idle=$idle
+}
+
 seg_vol() {
 	command -v wpctl >/dev/null 2>&1 || return 0
 	raw=$(wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null) || return 0
@@ -58,10 +84,18 @@ seg_bat() {
 		pct=$(cat "$bat/capacity")
 		st=$(cat "$bat/status" 2>/dev/null || echo Unknown)
 		case $st in
-		Charging) add bat " bat ${pct}%+ " "$RAY_ACCENT" ;;
+		Charging)
+			rm -f "$STATE/flag.batwarn"
+			add bat " bat ${pct}%+ " "$RAY_ACCENT"
+			;;
 		Discharging)
 			if [ "$pct" -le 15 ]; then
 				add bat " bat ${pct}% " "$RAY_URGENT"
+				# warn once per discharge, as a sticky critical notification
+				if [ "$pct" -le 10 ] && [ ! -e "$STATE/flag.batwarn" ] && command -v notify-send >/dev/null 2>&1; then
+					: >"$STATE/flag.batwarn"
+					notify-send -a ray -u critical "Battery low: ${pct}%" "Plug in soon." || true
+				fi
 			else
 				add bat " bat ${pct}% " "$RAY_DIM"
 			fi
@@ -88,12 +122,33 @@ seg_updates() {
 
 emit() {
 	out=
+	seg_flags
 	[ "${1:-}" = once ] || seg_updates
+	[ "${1:-}" = once ] || seg_cpu
 	seg_net
 	seg_vol
 	seg_bat
 	add clock " $(date +'%a %d %b  %H:%M') " "$RAY_FG"
 	printf '[%s]\n' "$out"
+}
+
+# what a click on each segment does (button 1 left, 3 right, 4/5 wheel)
+click() { # name button
+	local r=$BIN/ray
+	case $1:$2 in
+	net:*) "$r" settings wifi ;;
+	vol:1) "$r" settings sound ;;
+	vol:3) "$BIN/vol" mute ;;
+	vol:4) "$BIN/vol" up ;;
+	vol:5) "$BIN/vol" down ;;
+	cpu:*) foot --app-id ray-float btop ;;
+	bat:*) "$r" settings power ;;
+	updates:*) foot --app-id ray-float sh -c "'$r' update; printf '\nPress Enter to close '; read -r _" ;;
+	rec:*) "$BIN/shot" record ;;
+	dnd:*) "$r" toggle dnd ;;
+	awake:*) "$r" toggle idle ;;
+	clock:*) foot --app-id ray-float sh -c "cal -3; printf '\nPress Enter to close '; read -r _" ;;
+	esac
 }
 
 case ${1:-} in
@@ -110,9 +165,21 @@ esac
 # i3bar protocol: a header, then an endless JSON array of status lines.
 # Without the header swaybar falls back to plain text and shows raw JSON.
 trap 'exit 0' INT TERM
-printf '{"version":1}\n[\n'
+printf '{"version":1,"click_events":true}\n[\n'
 while :; do
 	emit
 	printf ','
-	sleep 2
+	# wait up to 2s for a click; clicks arrive as one JSON object per line
+	rc=0
+	IFS= read -r -t 2 line || rc=$?
+	if [ "$rc" -eq 0 ]; then
+		if [[ $line =~ \"name\":\"([a-z]+)\" ]]; then
+			name=${BASH_REMATCH[1]}
+			btn=1
+			[[ $line =~ \"button\":([0-9]+) ]] && btn=${BASH_REMATCH[1]}
+			(click "$name" "$btn" </dev/null >/dev/null 2>&1 &)
+		fi
+	elif [ "$rc" -le 128 ]; then
+		sleep 2 # stdin closed (no click events): don't spin
+	fi
 done

@@ -1,0 +1,17 @@
+# jade (dark): deep green glass, jade accents
+bg=#111c18
+bg2=#172520
+bg3=#23372f
+fg=#c1c9b8
+dim=#6f8a7d
+sun=#e5c07b
+amber=#d4a85f
+orange=#db9065
+red=#db6d6d
+green=#63b07a
+teal=#5fbfa5
+blue=#6fa8c7
+purple=#c08fc0
+accent=#5fbfa5
+urgent=#db6d6d
+variant=dark

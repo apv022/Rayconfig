@@ -14,7 +14,7 @@ BACKUP_ROOT=$HOME/.config-backup
 THEME=${RAYCONFIG_THEME:-$(cat "$STATE/theme" 2>/dev/null || echo sunset)}
 SUDO=(sudo)
 
-ALL_STAGES=(preflight packages link solarvim theme services verify)
+ALL_STAGES=(preflight packages link solarvim muhfm theme services verify)
 ONLY=()
 SKIP=()
 DRY=0
@@ -35,7 +35,7 @@ usage: install.sh [options]
   --services     enable system units (bluetooth)
   --theme NAME   sunset (default), sunny, dusk, moss
 
-stages: preflight packages link solarvim theme services verify
+stages: preflight packages link solarvim muhfm theme services verify
 EOF
 }
 
@@ -214,6 +214,20 @@ stage_link() {
 	linkdir "$ROOT/dots/mako" "$CFG/mako"
 	linkdir "$ROOT/dots/fuzzel" "$CFG/fuzzel"
 	linkdir "$ROOT/dots/swaylock" "$CFG/swaylock"
+	linkdir "$ROOT/dots/muhfm" "$CFG/muhfm"
+
+	# bash: one line in ~/.bashrc sources the repo's rc (prompt, aliases, fm)
+	local rc=$HOME/.bashrc line=". \"$ROOT/dots/shell/rc.sh\""
+	if grep -qF "dots/shell/rc.sh" "$rc" 2>/dev/null; then
+		ok "$rc sources dots/shell/rc.sh"
+	else
+		if [ "$DRY" = 1 ]; then
+			printf '  + append to %s: %s\n' "$rc" "$line"
+		else
+			printf '\n# rayconfig: prompt, aliases, fm (cd on quit). Remove this line to opt out.\n[ -f "%s/dots/shell/rc.sh" ] && %s\n' "$ROOT" "$line" >>"$rc"
+		fi
+		ok "$rc -> dots/shell/rc.sh"
+	fi
 
 	local f
 	for f in "$ROOT"/bin/*; do
@@ -247,11 +261,58 @@ stage_solarvim() {
 	ok "solarvim -> $CFG/solarvim"
 }
 
+# muhfm, the file manager, is its own repo: one Go file, standard library only.
+# Build it from source (official-repo `go`), rebuild only when it changed, and
+# make it the default for folders so every app's "open folder" lands there.
+MF_REPO=${MUHFM_REPO:-https://github.com/apv022/muhfm.git}
+MF_DIR=${XDG_DATA_HOME:-$HOME/.local/share}/muhfm
+stage_muhfm() {
+	say "muhfm"
+	if [ -d "$MF_DIR/.git" ]; then
+		run git -C "$MF_DIR" pull --quiet --ff-only || warn "muhfm has local changes; building them as-is"
+	elif [ -e "$MF_DIR" ]; then
+		warn "$MF_DIR exists and is not a git checkout; skipped"
+		return 0
+	else
+		run git clone --quiet --depth 1 "$MF_REPO" "$MF_DIR" || { warn "could not clone muhfm; skipped"; return 0; }
+	fi
+	if [ "$DRY" = 0 ] && [ ! -f "$MF_DIR/main.go" ]; then
+		warn "muhfm checkout has no main.go (old Python version?); skipped"
+		return 0
+	fi
+	command -v go >/dev/null 2>&1 || [ "$DRY" = 1 ] || { warn "go is not installed; run: install.sh --only packages,muhfm"; return 0; }
+	local rev
+	rev=$(git -C "$MF_DIR" rev-parse HEAD 2>/dev/null || echo none)
+	if [ -x "$LOCAL_BIN/muhfm" ] && [ "$(cat "$STATE/muhfm.rev" 2>/dev/null)" = "$rev" ]; then
+		ok "muhfm up to date (${rev:0:7})"
+	else
+		# keep Go's caches out of ~/go
+		run env GOPATH="${XDG_DATA_HOME:-$HOME/.local/share}/go" CGO_ENABLED=0 \
+			go -C "$MF_DIR" build -trimpath -ldflags="-s -w" -o "$LOCAL_BIN/muhfm" . ||
+			{ warn "muhfm failed to build"; return 0; }
+		[ "$DRY" = 1 ] || { mkdir -p "$STATE" && printf '%s\n' "$rev" >"$STATE/muhfm.rev"; }
+		ok "muhfm built (${rev:0:7}) -> $LOCAL_BIN/muhfm"
+	fi
+	run "$LOCAL_BIN/muhfm" --set-default >/dev/null
+	run "$ROOT/bin/ray" _defaults
+	ok "default apps: folders -> muhfm, text -> solarvim, images/video/pdf if installed"
+}
+
 stage_theme() {
 	say "theme: $THEME"
 	[ -d "$ROOT/themes/$THEME" ] || die "no such theme: $THEME (have: $(ls "$ROOT/themes" | tr '\n' ' '))"
 	run "$ROOT/bin/gen-theme" "$THEME"
 	run "$ROOT/bin/ray" _render
+	# btop owns btop.conf and rewrites it; we only point it at our theme file
+	local bc=$CFG/btop/btop.conf
+	if [ "$DRY" = 0 ]; then
+		mkdir -p "$CFG/btop"
+		if [ -f "$bc" ] && grep -q '^color_theme' "$bc"; then
+			sed -i 's|^color_theme.*|color_theme = "ray"|' "$bc"
+		else
+			printf 'color_theme = "ray"\n' >>"$bc"
+		fi
+	fi
 	ok "rendered from themes/$THEME/palette"
 }
 
@@ -291,8 +352,9 @@ stage_done() {
                             Super+Alt+Space  menu (update, theme, power)
                             ray update       update the whole system
 
-  configs:  $CFG/{sway,foot,mako,fuzzel,swaylock,solarvim}
+  configs:  $CFG/{sway,foot,mako,fuzzel,swaylock,muhfm,solarvim}
   scripts:  $LOCAL_BIN/{ray,status,theme,gen-theme,doctor,keys,vol,bright,shot,snap,winlist}
+  files:    $LOCAL_BIN/muhfm  (Super+E, default for folders)
   theme:    themes/$THEME/palette  (edit, then: ray theme $THEME)
   backups:  $BACKUP_ROOT
 EOF

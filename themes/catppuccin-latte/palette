@@ -1,0 +1,17 @@
+# catppuccin-latte (light): pastel on paper, after Catppuccin Latte
+bg=#eff1f5
+bg2=#e6e9ef
+bg3=#ccd0da
+fg=#4c4f69
+dim=#8c8fa1
+sun=#df8e1d
+amber=#c7811c
+orange=#fe640b
+red=#d20f39
+green=#40a02b
+teal=#179299
+blue=#1e66f5
+purple=#8839ef
+accent=#8839ef
+urgent=#d20f39
+variant=light

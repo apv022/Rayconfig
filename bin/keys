@@ -1,10 +1,10 @@
 #!/bin/sh
 # keys — cheat sheets, generated from the configs themselves. Nothing to keep
 # in sync: sway binds are read from 30-binds.conf (## section, # description),
-# solarvim's from its own key table.
+# solarvim's from its own key table, muhfm's from `muhfm --keys`.
 #
-#   keys            desktop + editor
-#   keys sway|vim   just one
+#   keys              desktop + editor + files
+#   keys sway|vim|fm  just one
 #   keys --pager    same, in less (what Super+/ opens)
 set -eu
 
@@ -57,11 +57,23 @@ vim_sheet() {
 	fi
 }
 
+fm_sheet() {
+	printf '\n%s☀ FILES — muhfm%s  %s(Super+E, ? inside for help)%s\n' "$H" "$Z" "$D" "$Z"
+	if command -v muhfm >/dev/null 2>&1; then
+		muhfm --keys | awk -v H="$H" -v K="$K" -v Z="$Z" '
+			/^## / { printf "\n%s%s%s\n", H, toupper(substr($0, 4)), Z; next }
+			/^  / { printf "  %s%-20s%s %s\n", K, substr($0, 3, 20), Z, substr($0, 24); next }'
+	else
+		printf '  muhfm is not installed — run: install.sh --only muhfm\n'
+	fi
+}
+
 all() {
 	case ${1:-all} in
 	sway) sway_sheet ;;
 	vim) vim_sheet ;;
-	*) sway_sheet; vim_sheet ;;
+	fm | files | muhfm) fm_sheet ;;
+	*) sway_sheet; vim_sheet; fm_sheet ;;
 	esac
 }
 

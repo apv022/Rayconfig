@@ -1,0 +1,17 @@
+# graphite (dark): matte black, one amber accent
+bg=#121212
+bg2=#1b1b1b
+bg3=#282828
+fg=#c8c8c8
+dim=#707070
+sun=#e8b04a
+amber=#d49a3a
+orange=#d8814f
+red=#d0635f
+green=#9db37a
+teal=#84b5aa
+blue=#8aa4c8
+purple=#b38fb0
+accent=#d49a3a
+urgent=#d0635f
+variant=dark

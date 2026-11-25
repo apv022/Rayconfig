@@ -1,0 +1,17 @@
+# everforest (dark): soft forest, after Everforest
+bg=#2d353b
+bg2=#343f44
+bg3=#3d484d
+fg=#d3c6aa
+dim=#859289
+sun=#dbbc7f
+amber=#d3a96a
+orange=#e69875
+red=#e67e80
+green=#a7c080
+teal=#83c092
+blue=#7fbbb3
+purple=#d699b6
+accent=#a7c080
+urgent=#e67e80
+variant=dark

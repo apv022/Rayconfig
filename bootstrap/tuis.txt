@@ -11,5 +11,14 @@ alsa-utils
 btop
 wlsunset
 power-profiles-daemon
-yazi
 fastfetch
+# Viewers so a double-click in muhfm opens something: images, video/audio,
+# PDFs, PDF previews, screenshot annotation, emoji for the picker, firmware.
+imv
+mpv
+zathura
+zathura-pdf-mupdf
+poppler
+satty
+noto-fonts-emoji
+fwupd

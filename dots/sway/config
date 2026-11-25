@@ -9,10 +9,6 @@ include /etc/sway/config.d/*
 
 # notifications
 exec mako
-# lock after 5 min, screen off after 10, always lock before sleep
-exec swayidle -w \
-	timeout 300 'swaylock -f' \
-	timeout 600 'swaymsg "output * power off"' resume 'swaymsg "output * power on"' \
-	before-sleep 'swaylock -f'
-# night light if enabled, and a hello on first login
-exec sh -c 'sleep 3; exec ~/.local/bin/ray startup'
+# `ray startup`: idle (screensaver 4 min, lock 5, screen off 10, lock before
+# sleep; Super+Ctrl+I pauses it), clipboard history, night light, a hello
+exec sh -c 'sleep 2; exec ~/.local/bin/ray startup'

@@ -4,9 +4,17 @@ A minimal Wayland desktop you own. Arch + sway, zero plugins, zero plugin
 frameworks, no AUR. Built-in bar, built-in lock/idle/wallpaper, and a handful
 of shell utilities instead of an ecosystem.
 
-The palette is solarvim's: warm suns, amber and deep crimson, with a dark
-"sunset" and light "sunny" variant. One palette file drives the terminal,
-compositor, notifications, launcher, wallpaper and Neovim.
+Everything Omarchy gives you — menus for everything, one-key themes that
+restyle every app, screenshots and recording, clipboard history, an emoji
+picker, web apps, OSD, a screensaver — as small shell functions you can read,
+plus [muhfm](https://github.com/apv022/muhfm), a one-file Go file manager that
+does what Dolphin does.
+
+17 themes ship: sunset and sunny (solarvim's own), dusk, moss, graphite, jade,
+and ports of Tokyo Night, Catppuccin (Mocha and Latte), Gruvbox, Nord,
+Everforest, Kanagawa, Rosé Pine (and Dawn), Flexoki Light and Ristretto. One
+palette file drives the terminal, compositor, bar, notifications, launcher,
+lock screen, file manager, btop, GTK's light/dark choice, wallpaper and Neovim.
 
 ```
 themes/<name>/palette  ──►  bin/gen-theme  ──►  every config that has color
@@ -71,12 +79,15 @@ GitHub caches the raw file for up to 5 minutes, so right after you change
 | job | tool | why not the alternative |
 |---|---|---|
 | compositor | `sway` | ships bar, lock, idle, wallpaper, nag — one C stack |
-| bar | `swaybar` | the i3bar protocol is stdin JSON; the bar is a shell script |
+| bar | `swaybar` | the i3bar protocol is stdin JSON; the bar is a shell script, and clicks come back on stdin |
 | terminal | `foot` | native Wayland, ~5 libs, config is a file, instant with `--server` |
+| files | `muhfm` | one Go file, no deps; tabs, split, trash, archives, drives, previews — default for folders |
 | launcher | `fuzzel` | `fuzzel --dmenu` turns anything into a picker |
-| notifications | `mako` | dumb renderer, `makoctl` for actions |
+| notifications | `mako` | dumb renderer, `makoctl` for actions, modes for do-not-disturb, OSD styling |
+| clipboard | `cliphist` | `wl-paste --watch` stores, fuzzel picks |
+| capture | `grim` + `slurp` + `wf-recorder` | screenshots, recording, colour picking: one `shot` script |
 | wallpaper | `swaybg` + generated PNG | gradient derived from the palette, no wallpaper daemon |
-| colors | `bin/gen-theme` | 70 lines of sh + sed instead of a theme framework |
+| colors | `bin/gen-theme` | ~100 lines of sh + sed instead of a theme framework |
 
 **On the terminal:** `st` is X11-only (XWayland) and its config is a patch queue
 you maintain forever. Writing your own means owning a VT parser. `foot` is the
@@ -93,10 +104,16 @@ graphical picker or a terminal app in a floating window:
 | Bluetooth | `bluetui`, else `bluetoothctl` (starts the service for you) |
 | Sound | `wiremix`, else `pulsemixer` / `alsamixer` |
 | Display | pick a screen → scale or resolution |
-| Theme | sunset · sunny · dusk · moss (wallpaper, bar, terminal, lock, editor, GTK apps) |
+| Theme | all 17, with a one-line description each |
+| Font | any installed monospace family, applied to every app |
 | Wallpaper | any image in `~/Pictures/wallpapers`, or the theme's |
 | Keyboard layout, Touchpad | pick from a list |
 | Night light, Power profile | `wlsunset`, `power-profiles-daemon` |
+| Default apps | folders → muhfm, text → solarvim, images → imv, video → mpv, PDF → zathura |
+| DNS | automatic, Cloudflare, Quad9 or Google, via NetworkManager |
+| Timezone, Password | `timedatectl`, `passwd` |
+| Fingerprint | installs `fprintd`, enrolls, lets sudo and the lock screen accept it |
+| Autologin | log in on tty1 without a password (asks first) |
 | Updates, System monitor | `ray update`, `btop` |
 | Ask an agent | Claude Code inside this repo (or claude.ai/code) |
 
@@ -104,44 +121,80 @@ Choices are stored in `~/.local/state/rayconfig/settings` (plain `key=value`)
 and rendered to `dots/sway/config.d/85-settings.conf` (gitignored), so they
 survive updates and you can still read every line.
 
-## Omarchy, taken apart
+## Omarchy, feature by feature
 
 [Omarchy](https://omarchy.org) gets the *experience* right: one command to a
 finished desktop, menus for everything, themes that restyle every app at once,
 TUIs instead of GTK settings panels, one-key updates. Rayconfig keeps that
-experience and drops the parts that cost ownership:
+experience and drops the parts that cost ownership: no Hyprland plugin
+ecosystem, no AUR, no ~100 scripts. Each row below is one function in `ray`,
+one script in `bin/`, or one line of config.
 
-| Omarchy | Rayconfig |
-|---|---|
-| Hyprland (plugin ecosystem) | sway — bar, lock, idle and wallpaper ship in the box |
-| Waybar, Walker, SwayOSD, hypr* daemons | `swaybar` + a 100-line `status` script, `fuzzel`, `mako` |
-| AUR helpers + AUR packages | official repos only; optional TUIs are skipped if missing |
-| ~100 `omarchy-*` scripts | `ray` + ~10 helpers; settings are one function each |
-| a theme = copies of every app's config | a theme = one 16-line palette, everything rendered from it |
-| bundled apps (web apps, Docker, Typora…) | nothing you didn't ask for; install what you want |
-| migrations framework for updates | `ray update`: git pull, then re-run the idempotent installer |
-| Neovim via LazyVim (dozens of plugins) | solarvim: one file, zero plugins |
+| Omarchy | Rayconfig | where |
+|---|---|---|
+| one-command install from the ISO | same, `curl … \| sh` | `install.sh` |
+| Omarchy menu (Super+Alt+Space): apps, learn, trigger, style, setup, install, remove, update, about, system | same tree | `ray menu` |
+| keybindings cheat sheet | generated from the configs (desktop, editor, files) | `Super+/`, `ray keys` |
+| themes that restyle everything | 17 palettes → foot, sway, bar, mako, fuzzel, swaylock, muhfm, btop, GTK, wallpaper, Neovim | `ray theme`, `Super+T`, `Super+Ctrl+T` |
+| next background | cycle theme wallpaper + `~/Pictures/wallpapers` | `Super+Ctrl+Space` |
+| font picker | one font for every app | Settings → Font |
+| Hyprland | sway — bar, lock, idle and wallpaper ship in the box | |
+| Waybar with click actions | `swaybar` + `bin/status`: click wifi, volume (scroll/right-click), battery, clock, updates | `bin/status` |
+| Walker launcher | `fuzzel` | `Super+D` |
+| SwayOSD | mako bubble with a progress bar, replaced in place | `bin/vol`, `bin/bright` |
+| hyprlock, hypridle | swaylock, swayidle (screensaver 4 min → lock 5 → screen off 10) | `ray idle` |
+| screensaver | a sun drifting in theme colours | `ray screensaver` |
+| hyprsunset night light | `wlsunset` | `Super+Ctrl+N` |
+| idle-lock toggle, do not disturb, toggle bar, gaps, transparency | same, with bar indicators | `Super+Ctrl+I`, `Super+Ctrl+,`, `Super+Shift+Space`, `Super+Shift+Backspace`, `Super+Backspace` |
+| screenshots + annotate | `grim`/`slurp`, `satty` | `Super+Shift+S`, `Print`, `Shift+Print` |
+| screen recording | `wf-recorder`, `● REC` in the bar | `Super+Alt+R` |
+| colour picker (hyprpicker) | `grim` one pixel → `#hex` on the clipboard | `Super+Shift+C` |
+| clipboard history | `cliphist` + fuzzel | `Super+Ctrl+V` |
+| emoji picker | fuzzel over a plain list | `Super+.` |
+| web apps | desktop entries running `chromium --app=…` | `ray webapp`, Menu → Install |
+| install / remove packages from a menu | fuzzel over `pacman -Sl` / `pacman -Qe` | `ray install`, `ray remove` |
+| fonts install | official `ttf-*` / `otf-*` packages | Menu → Install → Font |
+| Nautilus | muhfm: tabs, split, trash, archives, drives, Open With | `Super+E` |
+| imv, mpv as defaults | same, via `xdg-mime` | Settings → Default apps |
+| btop themed | rendered from the palette | `Super+Shift+Escape` |
+| bash with prompt and aliases | `dots/shell/rc.sh`, one line in `~/.bashrc` | `fm` cds where you quit muhfm |
+| omarchy-update, firmware, restart pieces | `ray update` (Arch + rayconfig + solarvim + muhfm), `fwupd`, `ray restart` | Menu → Update |
+| Wi-Fi, Bluetooth, audio, monitors, power, DNS, timezone, password | TUIs and pickers | `Super+I` |
+| fingerprint (fprintd) | enroll + PAM for sudo and swaylock | Settings → Fingerprint |
+| autologin | getty drop-in on tty1 | Settings → Autologin |
+| low battery warning | critical notification at 10% | `bin/status` |
+| hibernate in the power menu | shown when swap exists | `Super+Escape` |
+| AUR helpers + AUR packages | official repos only | |
+| LazyVim (dozens of plugins) | solarvim: one file, zero plugins | `Super+N` |
+
+Not mapped yet, on purpose or for lack of a test machine: full-disk
+encryption, btrfs snapshots and a Plymouth splash all change the ISO
+installer, which has to be tested in a VM before it ships. LocalSend sharing
+and universal Super+C/V copy-paste need packages outside the official repos.
 
 ## Everyday use
 
 | | |
 |---|---|
-| `Super+/` | **cheat sheet** — every desktop and editor shortcut, generated from the configs |
+| `Super+/` | **cheat sheet** — every desktop, editor and file-manager shortcut, generated from the configs |
+| `Super+Alt+Space` | menu: apps, learn, capture, toggle, style, setup, install, remove, update, about, system |
 | `Super+I` | settings |
-| `Super+Alt+Space` | menu: settings, update, shortcuts, agent, lock, power |
+| `Super+E` | files (muhfm) |
 | `Super+Escape` | power menu |
-| `ray update` | pulls rayconfig + solarvim, then updates Arch and installs anything new — on the running system, no reinstall |
-| bar | shows `↑ N updates` when Arch has updates (checked every 30 min) |
+| `Super+Ctrl+V` · `Super+.` | clipboard history · emoji |
+| `Super+Shift+S` · `Super+Alt+R` · `Super+Shift+C` | screenshot · record · colour picker |
+| `ray update` | pulls rayconfig, solarvim and muhfm, then updates Arch and installs anything new — on the running system, no reinstall |
+| bar | `↑ N updates` when Arch has updates; click anything to open its setting |
 
 Mod is Super and behaves like Windows: `Super+Left/Right` snap, `Up/Down`
 maximise/restore, `Tab` switch window, `E` files, `L` lock, `Enter` terminal,
-`D` launcher, `N` editor, `T` sunny/sunset. Run `ray keys` for the full list.
+`D` launcher, `N` editor, `T` light/dark, `.` emoji. Run `ray keys` for the full list.
 For vim-style `h/j/k/l` focus, add binds to `~/.config/sway/config.d/90-local.conf`
 (gitignored); `ray edit local` opens it.
 
 The cheat sheet has no second copy to maintain: sway's comes from the
 `## section` / `# description` comments in `dots/sway/config.d/30-binds.conf`,
-solarvim's from the table that creates its mappings.
+solarvim's from the table that creates its mappings, muhfm's from its key table.
 
 ## Layout
 
@@ -152,11 +205,17 @@ bootstrap/                 installer stages, package lists
 bin/                       ray, status, theme, gen-theme, doctor, keys, vol,
                            bright, shot, snap, winlist
 dots/                      hand-written configs; *.in files are templates
-templates/                 outputs that live outside the repo (solarvim colorscheme)
+dots/shell/rc.sh           prompt, aliases, fm — sourced from ~/.bashrc
+templates/                 outputs that live outside the repo (solarvim, btop)
 themes/                    palette files + generated wallpaper PNGs
+data/emoji.txt             the emoji picker's list
 tools/make-wallpaper.py    dev tool: regenerate wallpapers from a palette
 test/smoke.sh              dependency-free smoke test
 ```
+
+muhfm and solarvim are their own repos, cloned to `~/.local/share/` and kept
+current by `ray update`. muhfm is built from source with the official `go`
+package; nothing is downloaded but the code.
 
 **Editing rule:** edit `*.in`, never the generated file next to it. Generated
 files are gitignored and rebuilt by `ray theme`. Wallpapers are generated by
@@ -170,14 +229,16 @@ On an existing Arch box, log in on a TTY and type `sway`.
 ```sh
 ray doctor        # health check, read-only
 ray update        # everything up to date
-ray theme dusk    # sunset | sunny | dusk | moss | toggle
-ray keys          # cheat sheets (sway | vim)
+ray theme nord    # any folder in themes/, or toggle | next | prev | list
+ray keys          # cheat sheets (sway | vim | fm)
+ray menu          # everything else
 ray edit          # open the repo in solarvim
 ```
 
 ## Roadmap
 
-- OSD for volume/brightness via mako.
+- Disk encryption, btrfs snapshots and a boot splash in the ISO installer,
+  once each has been through a VM install.
 - Rounded corners / blur are not possible without swayfx (a sway fork, AUR).
   Deliberately left out.
 

@@ -44,7 +44,7 @@ else
 fi
 
 head_ "links"
-for d in sway foot mako fuzzel swaylock; do
+for d in sway foot mako fuzzel swaylock muhfm; do
 	link=$CFG/$d
 	src=$ROOT/dots/$d
 	if [ -L "$link" ] && [ "$(readlink -f "$link")" = "$(readlink -f "$src")" ]; then
@@ -67,13 +67,16 @@ good "utilities in $LOCAL_BIN"
 head_ "palettes"
 keys_of() { grep -vE '^[[:space:]]*(#|$)' "$1" | cut -d= -f1 | sort; }
 a=$(keys_of "$ROOT/themes/sunset/palette")
-b=$(keys_of "$ROOT/themes/sunny/palette")
-if [ "$a" = "$b" ]; then
-	good "sunset and sunny define the same keys ($(printf '%s\n' "$a" | wc -l))"
-else
-	bad "palette keys differ between sunset and sunny:"
-	diff <(printf '%s\n' "$a") <(printf '%s\n' "$b") | sed 's/^/       /'
-fi
+n=0
+for p in "$ROOT"/themes/*/palette; do
+	n=$((n + 1))
+	b=$(keys_of "$p")
+	if [ "$a" != "$b" ]; then
+		bad "$(basename "$(dirname "$p")") defines different keys than sunset:"
+		diff <(printf '%s\n' "$a") <(printf '%s\n' "$b") | sed 's/^/       /'
+	fi
+done
+good "$n themes define the same $(printf '%s\n' "$a" | wc -l) keys"
 if grep -qE '=#[0-9a-fA-F]{6}$' "$ROOT/themes/$THEME/palette"; then
 	good "active theme: $THEME"
 else
@@ -155,6 +158,19 @@ if [ -f "$CFG/solarvim/init.lua" ]; then
 	[ -f "$CFG/solarvim/colors/ray.lua" ] && good "palette colorscheme (ray.lua)" || meh "no colors/ray.lua — run: ray theme $THEME"
 else
 	meh "solarvim not installed — run: install.sh --only solarvim,theme"
+fi
+
+head_ "files (muhfm)"
+if command -v muhfm >/dev/null 2>&1; then
+	good "muhfm $(muhfm --version 2>/dev/null | awk '{print $2}')"
+	def=$(xdg-mime query default inode/directory 2>/dev/null || true)
+	if [ "$def" = muhfm.desktop ]; then
+		good "default for folders"
+	else
+		meh "folders open in '${def:-nothing}', not muhfm — run: muhfm --set-default"
+	fi
+else
+	meh "muhfm not installed — run: install.sh --only packages,muhfm"
 fi
 
 head_ "session"

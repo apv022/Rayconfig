@@ -1,0 +1,17 @@
+# tokyo-night (dark): night-city blues and neon, after Tokyo Night
+bg=#1a1b26
+bg2=#1f2335
+bg3=#292e42
+fg=#c0caf5
+dim=#565f89
+sun=#ffc777
+amber=#e0af68
+orange=#ff9e64
+red=#f7768e
+green=#9ece6a
+teal=#7dcfff
+blue=#7aa2f7
+purple=#bb9af7
+accent=#7aa2f7
+urgent=#f7768e
+variant=dark

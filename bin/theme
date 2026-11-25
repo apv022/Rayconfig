@@ -1,25 +1,50 @@
 #!/bin/sh
 # theme — switch palette and reload the running session.
 #
-#   theme sunset
-#   theme sunny
-#   theme toggle
+#   theme sunset          any folder name under themes/
+#   theme toggle          dark <-> light partner (Super+T)
+#   theme next | prev     cycle through every theme (Super+Shift+T)
+#   theme list
 set -eu
 
-ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$(readlink -f "$0")")/.." && pwd)
 STATE=${XDG_STATE_HOME:-$HOME/.local/state}/rayconfig
+CFG=${XDG_CONFIG_HOME:-$HOME/.config}
 
 cur=$(cat "$STATE/theme" 2>/dev/null || echo sunset)
+all() { find "$ROOT/themes" -mindepth 2 -maxdepth 2 -name palette | sed 's|/palette$||; s|.*/||' | sort; }
+variant() { sed -n 's/^variant=//p' "$ROOT/themes/$1/palette" | head -n1; }
+
+# Each family's light/dark partner; anything else flips to sunny/sunset.
+partner() {
+	case $1 in
+	sunset) echo sunny ;; sunny) echo sunset ;;
+	catppuccin) echo catppuccin-latte ;; catppuccin-latte) echo catppuccin ;;
+	rose-pine) echo rose-pine-dawn ;; rose-pine-dawn) echo rose-pine ;;
+	*) if [ "$(variant "$1")" = light ]; then echo sunset; else echo sunny; fi ;;
+	esac
+}
+
+step() { # +1 / -1
+	list=$(all)
+	n=$(printf '%s\n' "$list" | wc -l)
+	i=$(printf '%s\n' "$list" | grep -nx "$cur" | cut -d: -f1)
+	i=$(( ((${i:-1} - 1 + $1 + n) % n) + 1 ))
+	printf '%s\n' "$list" | sed -n "${i}p"
+}
+
 case ${1:-} in
 '' | -h | --help)
-	printf 'usage: theme <%s|toggle>\n' "$(ls "$ROOT/themes" | tr '\n' '|' | sed 's/|$//')" >&2
+	printf 'usage: theme <name|toggle|next|prev|list>\nthemes: %s\n' "$(all | tr '\n' ' ')" >&2
 	exit 2
 	;;
-toggle)
-	if [ "$cur" = sunset ]; then next=sunny; else next=sunset; fi
-	;;
+list) all; exit 0 ;;
+toggle) next=$(partner "$cur") ;;
+next) next=$(step 1) ;;
+prev) next=$(step -1) ;;
 *) next=$1 ;;
 esac
+[ -f "$ROOT/themes/$next/palette" ] || { printf 'theme: no such theme: %s\n' "$next" >&2; exit 2; }
 
 [ "$next" = "$cur" ] && [ "${2:-}" != "--force" ] && {
 	printf 'theme: already %s\n' "$next"
@@ -34,13 +59,23 @@ if command -v swaymsg >/dev/null 2>&1 && swaymsg -t get_version >/dev/null 2>&1;
 fi
 command -v makoctl >/dev/null 2>&1 && makoctl reload >/dev/null 2>&1 && printf 'reloaded: mako\n'
 
-# GTK/Chromium/Electron apps (Brave, Firefox file pickers) follow this.
+# GTK/Chromium/Electron apps (browsers, file pickers) follow the variant.
+v=$(variant "$next")
 if command -v gsettings >/dev/null 2>&1; then
-	case $(sed -n 's/^variant=//p' "$ROOT/themes/$next/palette") in
-	light) gsettings set org.gnome.desktop.interface color-scheme prefer-light 2>/dev/null || true ;;
-	*) gsettings set org.gnome.desktop.interface color-scheme prefer-dark 2>/dev/null || true ;;
-	esac
+	gsettings set org.gnome.desktop.interface color-scheme "prefer-$v" 2>/dev/null || true
 fi
+dark=false
+[ "$v" = dark ] && dark=true
+for g in gtk-3.0 gtk-4.0; do
+	f=$CFG/$g/settings.ini
+	mkdir -p "$CFG/$g"
+	[ -f "$f" ] || printf '[Settings]\n' >"$f"
+	if grep -q '^gtk-application-prefer-dark-theme' "$f"; then
+		sed -i "s/^gtk-application-prefer-dark-theme.*/gtk-application-prefer-dark-theme=$dark/" "$f"
+	else
+		sed -i "/^\[Settings\]/a gtk-application-prefer-dark-theme=$dark" "$f"
+	fi
+done
 command -v notify-send >/dev/null 2>&1 && notify-send -a ray "Theme" "$next" || true
 
-printf 'theme: %s (new foot windows pick up the palette)\n' "$next"
+printf 'theme: %s (new terminal windows pick up the palette)\n' "$next"

@@ -26,6 +26,14 @@ noto-fonts
 # editor + the tools solarvim's finder/grep use
 neovim
 ripgrep
+# muhfm (the file manager) is built from source: Go is the only toolchain.
+# udisks2 mounts USB drives from it without root.
+go
+udisks2
+# clipboard history (Super+Ctrl+V), screen recording, media keys
+cliphist
+wf-recorder
+playerctl
 # `ray update` / bar update count, notify-send for `ray` messages, pager for keys
 pacman-contrib
 libnotify
