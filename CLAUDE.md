@@ -183,6 +183,12 @@ first — that is a missing render step, not a bad config.
   "$0"` before computing `ROOT`, or they look for the repo in `~/.local`.
 - **Wallpapers are JPEG** (a photo is 10× smaller than PNG); the state link is
   `~/.local/state/rayconfig/wallpaper` with no extension, swaybg sniffs it.
+- **profile.d runs in name order**: the ISO's `10-rayconfig.sh` `exec`s sway,
+  so Arch's `locale.sh` (later in the order) never ran and the whole session
+  had `LANG=C` — btop refused to start, foot warned in every window. The
+  autostart sources `locale.sh` first; `fix_locale` (packages stage, so `ray
+  update`) patches old installs and makes sure a UTF-8 LANG exists and is
+  generated. `ray` and `rc.sh` fall back to glibc's built-in `C.UTF-8`.
 - **Fonts and colors share gen-theme**: changing the font re-runs gen-theme
   for the current theme; never hard-code a font name into a template.
 

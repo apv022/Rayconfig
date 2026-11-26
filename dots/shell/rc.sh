@@ -5,6 +5,12 @@
 
 case $- in *i*) ;; *) return 0 ;; esac
 
+# no UTF-8 locale (LANG=C)? use glibc's built-in C.UTF-8 so TUIs work
+case ${LC_ALL:-${LC_CTYPE:-${LANG:-}}} in
+*[Uu][Tt][Ff]-8 | *[Uu][Tt][Ff]8) ;;
+*) export LANG=C.UTF-8 && unset LC_ALL ;;
+esac
+
 export TERMINAL=${TERMINAL:-foot}
 # Settings → Defaults → Editor writes editor= to the settings state
 __ray_ed=$(sed -n 's/^editor=//p' "${XDG_STATE_HOME:-$HOME/.local/state}/rayconfig/settings" 2>/dev/null | tail -n1)

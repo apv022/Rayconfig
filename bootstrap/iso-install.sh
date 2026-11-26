@@ -346,7 +346,10 @@ case ":\$PATH:" in *":\$HOME/.local/bin:"*) ;; *) export PATH="\$HOME/.local/bin
 export EDITOR=nvim VISUAL=nvim
 export NVIM_APPNAME=\${NVIM_APPNAME:-solarvim}
 # Start sway when logging in on tty1. Opt out: touch ~/.config/rayconfig-no-autostart
+# profile.d runs in name order and this file comes before Arch's locale.sh;
+# exec replaces the shell, so load the locale here or sway starts with LANG=C.
 if [ "\$(tty)" = /dev/tty1 ] && [ -z "\${WAYLAND_DISPLAY:-}" ] && [ ! -e "\$HOME/.config/rayconfig-no-autostart" ] && command -v sway >/dev/null; then
+	[ -r /etc/profile.d/locale.sh ] && . /etc/profile.d/locale.sh
 	exec sway
 fi
 PROFILE

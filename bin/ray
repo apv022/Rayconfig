@@ -16,6 +16,13 @@ APPS=$DATA/applications
 SETTINGS=$STATE/settings
 SWAYGEN=$ROOT/dots/sway/config.d/85-settings.conf # gitignored, generated
 
+# A session without a UTF-8 locale (LANG=C) makes btop and other TUIs refuse
+# to start. C.UTF-8 is built into glibc, so it is always there as a fallback.
+case ${LC_ALL:-${LC_CTYPE:-${LANG:-}}} in
+*[Uu][Tt][Ff]-8 | *[Uu][Tt][Ff]8) ;;
+*) export LANG=C.UTF-8 && unset LC_ALL ;;
+esac
+
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
 	H=$'\033[1;38;5;180m' G=$'\033[38;5;149m' R=$'\033[38;5;174m' Z=$'\033[0m'
 else H='' G='' R='' Z=''; fi

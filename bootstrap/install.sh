@@ -172,11 +172,44 @@ stage_packages() {
 		"${SUDO[@]}" systemctl enable --now power-profiles-daemon.service >/dev/null 2>&1 || true
 	fi
 
+	fix_locale
+
 	if [ "$EXTRAS" = 1 ]; then
 		local extra=()
 		mapfile -t extra < <(grep -vE '^[[:space:]]*(#|$)' "$ROOT/bootstrap/optional.txt")
 		run "${SUDO[@]}" pacman -S --needed --noconfirm "${extra[@]}"
 		ok "${#extra[@]} extras"
+	fi
+}
+
+# Without a UTF-8 locale btop refuses to start and foot warns in every window.
+# Make sure /etc/locale.conf names one and it is generated. Also patch the
+# tty1 autostart written by older ISO installs: it exec'd sway before Arch's
+# locale.sh ran, so the whole session had LANG=C.
+norm_locale() { printf '%s' "$1" | tr 'A-Z' 'a-z' | tr -d -- '-'; }
+fix_locale() {
+	local conf=/etc/locale.conf prof=/etc/profile.d/10-rayconfig.sh lang
+	lang=$(sed -n 's/^LANG=//p' "$conf" 2>/dev/null | tr -d '"' | tail -n1)
+	case $lang in
+	'' | C | POSIX)
+		lang=en_US.UTF-8
+		if [ "$DRY" = 1 ]; then
+			printf '  + set LANG=%s in %s\n' "$lang" "$conf"
+		else
+			"${SUDO[@]}" sh -c "grep -v '^LANG=' '$conf' 2>/dev/null > '$conf.tmp'; printf 'LANG=%s\\n' '$lang' >> '$conf.tmp'; mv '$conf.tmp' '$conf'; chmod 644 '$conf'"
+		fi
+		;;
+	esac
+	if ! locale -a 2>/dev/null | while read -r l; do norm_locale "$l"; echo; done | grep -qx "$(norm_locale "$lang")"; then
+		run "${SUDO[@]}" sed -i "s/^#[[:space:]]*\\($lang UTF-8\\)/\\1/" /etc/locale.gen
+		grep -q "^$lang UTF-8" /etc/locale.gen 2>/dev/null || [ "$DRY" = 1 ] ||
+			printf '%s UTF-8\n' "$lang" | "${SUDO[@]}" tee -a /etc/locale.gen >/dev/null
+		run "${SUDO[@]}" locale-gen >/dev/null
+	fi
+	ok "system locale: $lang"
+	if [ -f "$prof" ] && ! grep -q 'locale.sh' "$prof"; then
+		run "${SUDO[@]}" sed -i 's|^\([[:space:]]*\)exec sway$|\1[ -r /etc/profile.d/locale.sh ] \&\& . /etc/profile.d/locale.sh\n\1exec sway|' "$prof"
+		ok "$prof loads the locale before starting sway (log out and in once)"
 	fi
 }
 

@@ -182,6 +182,20 @@ else
 	meh "muhfm not installed — run: install.sh --only packages,muhfm"
 fi
 
+head_ "locale"
+case ${LC_ALL:-${LC_CTYPE:-${LANG:-}}} in
+*[Uu][Tt][Ff]-8 | *[Uu][Tt][Ff]8) good "session locale: ${LC_ALL:-${LC_CTYPE:-$LANG}}" ;;
+*) bad "session locale is '${LANG:-unset}', not UTF-8 (btop and others refuse to start) — run: ray update, then log out and in" ;;
+esac
+if grep -q '^LANG=.*[Uu][Tt][Ff]-\{0,1\}8' /etc/locale.conf 2>/dev/null; then
+	good "/etc/locale.conf: $(sed -n 's/^LANG=//p' /etc/locale.conf | tail -n1)"
+else
+	bad "/etc/locale.conf has no UTF-8 LANG — run: ray update"
+fi
+if [ -f /etc/profile.d/10-rayconfig.sh ] && ! grep -q locale.sh /etc/profile.d/10-rayconfig.sh; then
+	bad "the tty1 autostart starts sway before the locale is loaded — run: ray update"
+fi
+
 head_ "session"
 if [ -n "${SWAYSOCK:-}" ] && command -v swaymsg >/dev/null 2>&1; then
 	good "running inside sway"
